@@ -1,0 +1,16 @@
+target/
+.classpath
+.project
+.settings/
+
+*.log
+
+# Eclipse
+.metadata/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Environment files
+.env
