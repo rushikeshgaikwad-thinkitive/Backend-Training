@@ -9,6 +9,7 @@ public class PatientRequest {
 	    private String gender;
 	    private String phone;
 	    private String email;
+	    private boolean active;
 
 	    public String getName() {
 	        return name;
@@ -49,4 +50,13 @@ public class PatientRequest {
 	    public void setEmail(String email) {
 	        this.email = email;
 	    }
+
+		public boolean isActive() {
+			return active;
+		}
+
+		public void setActive(boolean active) {
+			this.active = active;
+		}
+	    
 }

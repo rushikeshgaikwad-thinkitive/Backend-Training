@@ -17,6 +17,7 @@ public interface PatientService {
 	PatientResponse updatePatient(Long id , PatientRequest rquest);
 	
 	void deletePatient(Long id);
+	List<PatientResponse> getActivePatients();
 	
 	
 }

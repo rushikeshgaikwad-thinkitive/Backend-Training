@@ -9,6 +9,7 @@ import bt.com.dto.response.PatientResponse;
 import bt.com.entity.Patient;
 import bt.com.repository.PatientRepository;
 import bt.com.service.PatientService;
+import java.util.function.Predicate;
 
 @Service
 public class PatientServiceImpl  implements PatientService {
@@ -29,7 +30,7 @@ public class PatientServiceImpl  implements PatientService {
 	        patient.setGender(request.getGender());
 	        patient.setPhone(request.getPhone());
 	        patient.setEmail(request.getEmail());
-	        patient.setActive(true);
+	        patient.setActive(request.isActive());
 
 	        Patient savedPatient = patientRepository.save(patient);
 
@@ -85,6 +86,20 @@ public class PatientServiceImpl  implements PatientService {
 	        patientRepository.deleteById(id);
 	    }
 
+	    
+	    @Override
+	 public List<PatientResponse> getActivePatients(){
+	    	
+	    	List<Patient> patients = patientRepository.findAll();
+	    	
+	    Predicate<Patient> isActive = patient -> patient.isActive();
+	    
+	    return patients.stream()
+	    		.filter(isActive)
+	    		.map(patient -> mapToResponse(patient))
+	    		.toList();
+	    	
+	    }
 	    private PatientResponse mapToResponse(Patient patient) {
 
 	        return new PatientResponse(

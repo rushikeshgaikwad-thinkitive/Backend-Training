@@ -68,4 +68,13 @@ public class PatientController {
 
         return ResponseEntity.noContent().build();
     }
+    
+    
+    @GetMapping("/active")
+    public ResponseEntity<List<PatientResponse>> getActivePatients() {
+
+        return ResponseEntity.ok(
+                patientService.getActivePatients()
+        );
+    }
 }
