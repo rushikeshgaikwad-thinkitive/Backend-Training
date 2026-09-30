@@ -19,5 +19,18 @@ public interface PatientService {
 	void deletePatient(Long id);
 	List<PatientResponse> getActivePatients();
 	
+
+    // default method
+    default void printServiceName() {
+        System.out.println("Patient Service");
+    }
+
+
+    // static method to check valid age
+    static boolean isValidAge(int age) {
+        return age > 0 && age <= 120;
+    }
+
+	
 	
 }
