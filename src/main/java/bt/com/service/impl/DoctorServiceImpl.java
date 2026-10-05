@@ -2,8 +2,8 @@ package bt.com.service.impl;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import org.springframework.stereotype.Service;
 
@@ -11,43 +11,65 @@ import bt.com.dto.request.DoctorRequest;
 import bt.com.dto.response.DoctorResponse;
 import bt.com.entity.Doctor;
 import bt.com.exception.DoctorNotFoundException;
+import bt.com.factory.DoctorFactory;
+import bt.com.mapper.DoctorMapper;
 import bt.com.repository.DoctorRepository;
 import bt.com.service.DoctorService;
+import bt.com.validator.DoctorValidator;
 
 @Service
 public class DoctorServiceImpl implements DoctorService {
 
     private final DoctorRepository doctorRepository;
+    private final DoctorMapper doctorMapper;
+    private final DoctorValidator doctorValidator;
+    private final DoctorFactory doctorFactory;
 
-    public DoctorServiceImpl(DoctorRepository doctorRepository) {
+    public DoctorServiceImpl(
+            DoctorRepository doctorRepository,
+            DoctorMapper doctorMapper,
+            DoctorValidator doctorValidator,
+            DoctorFactory doctorFactory) {
+
         this.doctorRepository = doctorRepository;
+        this.doctorMapper = doctorMapper;
+        this.doctorValidator = doctorValidator;
+        this.doctorFactory = doctorFactory;
     }
 
     // Create Doctor
     @Override
     public DoctorResponse createDoctor(DoctorRequest request) {
 
-        Doctor doctor = new Doctor();
+        doctorValidator.validate(request);
 
-        doctor.setName(request.getName());
-        doctor.setSpecialization(request.getSpecialization());
-        doctor.setPhone(request.getPhone());
-        doctor.setEmail(request.getEmail());
-        doctor.setActive(request.isActive());
+        Doctor doctor =
+                doctorFactory.createDoctor(request);
 
-        Doctor savedDoctor = doctorRepository.save(doctor);
+        Doctor savedDoctor =
+                doctorRepository.save(doctor);
 
-        return mapToResponse(savedDoctor);
+        return doctorMapper.toResponse(savedDoctor);
     }
 
     // Get all Doctors
     @Override
     public List<DoctorResponse> getAllDoctors() {
 
-        return doctorRepository.findAll()
-                .stream()
-                .sorted(Comparator.comparing(Doctor::getName))
-                .map(this::mapToResponse)
+        List<Doctor> doctors =
+                doctorRepository.findAll();
+
+        Comparator<Doctor> byName =
+                Comparator.comparing(
+                        Doctor::getName,
+                        Comparator.nullsLast(
+                                Comparator.naturalOrder()
+                        )
+                );
+
+        return doctors.stream()
+                .sorted(byName)
+                .map(doctorMapper::toResponse)
                 .toList();
     }
 
@@ -55,12 +77,16 @@ public class DoctorServiceImpl implements DoctorService {
     @Override
     public DoctorResponse getDoctorById(Long id) {
 
-        return doctorRepository.findById(id)
-                .map(this::mapToResponse)
-                .orElseThrow(() ->
-                        new DoctorNotFoundException(
-                                "Doctor not found with id: " + id
-                        ));
+        Supplier<DoctorNotFoundException> doctorNotFound =
+                () -> new DoctorNotFoundException(
+                        "Doctor not found with id: " + id
+                );
+
+        Doctor doctor =
+                doctorRepository.findById(id)
+                        .orElseThrow(doctorNotFound);
+
+        return doctorMapper.toResponse(doctor);
     }
 
     // Update Doctor
@@ -69,32 +95,39 @@ public class DoctorServiceImpl implements DoctorService {
             Long id,
             DoctorRequest request) {
 
-        Doctor doctor = doctorRepository.findById(id)
-                .orElseThrow(() ->
-                        new DoctorNotFoundException(
-                                "Doctor not found with id: " + id
-                        ));
+        doctorValidator.validate(request);
+
+        Doctor doctor =
+                doctorRepository.findById(id)
+                        .orElseThrow(() ->
+                                new DoctorNotFoundException(
+                                        "Doctor not found with id: " + id
+                                ));
 
         doctor.setName(request.getName());
-        doctor.setSpecialization(request.getSpecialization());
+        doctor.setSpecialization(
+                request.getSpecialization()
+        );
         doctor.setPhone(request.getPhone());
         doctor.setEmail(request.getEmail());
         doctor.setActive(request.isActive());
 
-        Doctor updatedDoctor = doctorRepository.save(doctor);
+        Doctor updatedDoctor =
+                doctorRepository.save(doctor);
 
-        return mapToResponse(updatedDoctor);
+        return doctorMapper.toResponse(updatedDoctor);
     }
 
     // Delete Doctor
     @Override
     public void deleteDoctor(Long id) {
 
-        doctorRepository.findById(id)
-                .orElseThrow(() ->
-                        new DoctorNotFoundException(
-                                "Doctor not found with id: " + id
-                        ));
+        if (!doctorRepository.existsById(id)) {
+
+            throw new DoctorNotFoundException(
+                    "Doctor not found with id: " + id
+            );
+        }
 
         doctorRepository.deleteById(id);
     }
@@ -103,42 +136,24 @@ public class DoctorServiceImpl implements DoctorService {
     @Override
     public List<DoctorResponse> getActiveDoctors() {
 
-        Predicate<Doctor> isActive = Doctor::isActive;
+        List<Doctor> doctors =
+                doctorRepository.findAll();
 
-        return doctorRepository.findAll()
-                .stream()
+        Predicate<Doctor> isActive =
+                Doctor::isActive;
+
+        return doctors.stream()
                 .filter(isActive)
-                .sorted(Comparator.comparing(Doctor::getName))
-                .map(this::mapToResponse)
+                .sorted(
+                        Comparator.comparing(
+                                Doctor::getName,
+                                Comparator.nullsLast(
+                                        Comparator.naturalOrder()
+                                )
+                        )
+                )
+                .map(doctorMapper::toResponse)
                 .toList();
     }
 
-    // Consumer
-    public void logAllDoctors() {
-
-        List<Doctor> doctors = doctorRepository.findAll();
-
-        Consumer<Doctor> printDoctor =
-                doctor -> System.out.println(
-                        "Doctor ID: " + doctor.getId()
-                        + ", Name: " + doctor.getName()
-                        + ", Specialization: "
-                        + doctor.getSpecialization()
-                );
-
-        doctors.forEach(printDoctor);
-    }
-
-    // Entity → Response DTO
-    private DoctorResponse mapToResponse(Doctor doctor) {
-
-        return DoctorResponse.builder()
-                .id(doctor.getId())
-                .name(doctor.getName())
-                .specialization(doctor.getSpecialization())
-                .phone(doctor.getPhone())
-                .email(doctor.getEmail())
-                .active(doctor.isActive())
-                .build();
-    }
 }

@@ -1,3 +1,4 @@
+
 package bt.com.service.impl;
 
 import java.util.Comparator;
@@ -13,40 +14,45 @@ import bt.com.dto.request.PatientRequest;
 import bt.com.dto.response.PatientResponse;
 import bt.com.entity.Patient;
 import bt.com.exception.PatientNotFoundException;
+import bt.com.factory.PatientFactory;
+import bt.com.mapper.PatientMapper;
 import bt.com.repository.PatientRepository;
 import bt.com.service.PatientService;
+import bt.com.validator.PatientValidator;
 
 @Service
 public class PatientServiceImpl implements PatientService {
 
     private final PatientRepository patientRepository;
+    private final PatientMapper patientMapper;
+    private final PatientValidator patientValidator;
+    private final PatientFactory patientFactory;
 
-    public PatientServiceImpl(PatientRepository patientRepository) {
+    public PatientServiceImpl(
+            PatientRepository patientRepository,
+            PatientMapper patientMapper,
+            PatientValidator patientValidator,
+            PatientFactory patientFactory) {
+
         this.patientRepository = patientRepository;
+        this.patientMapper = patientMapper;
+        this.patientValidator = patientValidator;
+        this.patientFactory = patientFactory;
     }
 
     // Create patient
     @Override
     public PatientResponse createPatient(PatientRequest request) {
 
-    	
-    	 if (!PatientService.isValidAge(request.getAge())) {
-    	        throw new IllegalArgumentException(
-    	                "Patient age must be between 1 and 120"
-    	        );
-    	 }
-        Patient patient = new Patient();
 
-        patient.setName(request.getName());
-        patient.setAge(request.getAge());
-        patient.setGender(request.getGender());
-        patient.setPhone(request.getPhone());
-        patient.setEmail(request.getEmail());
-        patient.setActive(request.isActive());
+        patientValidator.validate(request);
+
+        
+        Patient patient = patientFactory.createPatient(request);
 
         Patient savedPatient = patientRepository.save(patient);
 
-        return mapToResponse(savedPatient);
+        return patientMapper.toResponse(savedPatient);
     }
 
     // Get all patients
@@ -56,20 +62,17 @@ public class PatientServiceImpl implements PatientService {
         List<Patient> patients = patientRepository.findAll();
 
         Function<Patient, PatientResponse> patientToResponse =
-                patient -> mapToResponse(patient);
-           
-                
-                //use of Comparator to sort the patients in ascending order
-         Comparator<Patient> byAge =
-                  Comparator.comparing(Patient::getAge);
-                  
-//                  For descending order
-//                             .reversed();
-         
+                patientMapper::toResponse;
+
+        // Sort patients by name
+        Comparator<Patient> byName =
+                Comparator.comparing(
+                        Patient::getName,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                );
 
         return patients.stream()
-
-        		    .sorted(byAge)
+                .sorted(byName)
                 .map(patientToResponse)
                 .toList();
     }
@@ -78,7 +81,6 @@ public class PatientServiceImpl implements PatientService {
     @Override
     public PatientResponse getPatientById(Long id) {
 
-        //Supplier provides the exception only when the patient is not found.
         Supplier<PatientNotFoundException> patientNotFound =
                 () -> new PatientNotFoundException(
                         "Patient not found with id: " + id
@@ -87,7 +89,7 @@ public class PatientServiceImpl implements PatientService {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(patientNotFound);
 
-        return mapToResponse(patient);
+        return patientMapper.toResponse(patient);
     }
 
     // Update patient
@@ -96,6 +98,8 @@ public class PatientServiceImpl implements PatientService {
             Long id,
             PatientRequest request) {
 
+        patientValidator.validate(request);
+
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(() ->
                         new PatientNotFoundException(
@@ -103,15 +107,16 @@ public class PatientServiceImpl implements PatientService {
                         ));
 
         patient.setName(request.getName());
-        patient.setAge(request.getAge());
+        patient.setDateOfBirth(request.getDateOfBirth());
         patient.setGender(request.getGender());
         patient.setPhone(request.getPhone());
         patient.setEmail(request.getEmail());
         patient.setActive(request.isActive());
 
-        Patient updatedPatient = patientRepository.save(patient);
+        Patient updatedPatient =
+                patientRepository.save(patient);
 
-        return mapToResponse(updatedPatient);
+        return patientMapper.toResponse(updatedPatient);
     }
 
     // Delete patient
@@ -134,21 +139,19 @@ public class PatientServiceImpl implements PatientService {
         List<Patient> patients = patientRepository.findAll();
 
         Predicate<Patient> isActive =
-                patient -> patient.isActive();
-                
-//              By Name
-              Comparator<Patient> byName =
-             	        Comparator.comparing(Patient::getName);
+                Patient::isActive;
 
-      return  patients.stream()
-        		    .sorted(byName)
+        Comparator<Patient> byName =
+                Comparator.comparing(
+                        Patient::getName,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                );
+
+        return patients.stream()
                 .filter(isActive)
-                .map(patient -> mapToResponse(patient))
+                .sorted(byName)
+                .map(patientMapper::toResponse)
                 .toList();
-      
-
-                 
-      
     }
 
     // Consumer function
@@ -159,24 +162,10 @@ public class PatientServiceImpl implements PatientService {
         Consumer<Patient> printPatient =
                 patient -> System.out.println(
                         "Patient ID: " + patient.getId()
-                        + ", Name: " + patient.getName()
+                                + ", Name: " + patient.getName()
+                                + ", DOB: " + patient.getDateOfBirth()
                 );
 
-                patients.stream()
-                .forEach(printPatient);
-    }
-
-    // Convert Patient entity to PatientResponse DTO
-    private PatientResponse mapToResponse(Patient patient) {
-
-        return PatientResponse.builder()
-                .id(patient.getId())
-                .name(patient.getName())
-                .age(patient.getAge())
-                .gender(patient.getGender())
-                .phone(patient.getPhone())
-                .email(patient.getEmail())
-                .active(patient.isActive())
-                .build();
+        patients.forEach(printPatient);
     }
 }
