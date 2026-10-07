@@ -1,5 +1,7 @@
 package bt.com.dto.request;
 
+import java.time.LocalDate;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,7 +10,7 @@ import lombok.Setter;
 public class PatientRequest {
 
     private String name;
-    private int age;
+    private LocalDate dateOfBirth;
     private String gender;
     private String phone;
     private String email;

@@ -9,15 +9,19 @@ import bt.com.dto.response.PatientResponse;
 
 public interface PatientService {
 	PatientResponse createPatient(PatientRequest request);
-	
-	List<PatientResponse> getAllPatients();
-	
-	PatientResponse getPatientById(Long id);
-	
-	PatientResponse updatePatient(Long id , PatientRequest rquest);
-	
-	void deletePatient(Long id);
-	List<PatientResponse> getActivePatients();
+
+    List<PatientResponse> getAllPatients();
+
+    PatientResponse getPatientById(Long id);
+
+    PatientResponse updatePatient(
+            Long id,
+            PatientRequest request
+    );
+
+    void deletePatient(Long id);
+
+    List<PatientResponse> getActivePatients();
 	
 
     // default method

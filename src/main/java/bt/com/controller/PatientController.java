@@ -1,6 +1,5 @@
 package bt.com.controller;
 
-
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -68,8 +67,7 @@ public class PatientController {
 
         return ResponseEntity.noContent().build();
     }
-    
-    
+
     @GetMapping("/active")
     public ResponseEntity<List<PatientResponse>> getActivePatients() {
 
@@ -77,6 +75,4 @@ public class PatientController {
                 patientService.getActivePatients()
         );
     }
-   
-
 }
