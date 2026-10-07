@@ -19,7 +19,9 @@ import bt.com.mapper.PatientMapper;
 import bt.com.repository.PatientRepository;
 import bt.com.service.PatientService;
 import bt.com.validator.PatientValidator;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class PatientServiceImpl implements PatientService {
 
@@ -44,13 +46,23 @@ public class PatientServiceImpl implements PatientService {
     @Override
     public PatientResponse createPatient(PatientRequest request) {
 
-
+    	 log.info("Creating new patient");
+     
         patientValidator.validate(request);
+        
+      
 
         
         Patient patient = patientFactory.createPatient(request);
+        
+        
 
         Patient savedPatient = patientRepository.save(patient);
+        
+        log.info(
+                "Patient created successfully with id: {}",
+                savedPatient.getId()
+        );
 
         return patientMapper.toResponse(savedPatient);
     }
@@ -58,8 +70,12 @@ public class PatientServiceImpl implements PatientService {
     // Get all patients
     @Override
     public List<PatientResponse> getAllPatients() {
+    	
+    	   log.info("Fetching all patients");
 
         List<Patient> patients = patientRepository.findAll();
+        
+       
 
         Function<Patient, PatientResponse> patientToResponse =
                 patientMapper::toResponse;
@@ -71,16 +87,24 @@ public class PatientServiceImpl implements PatientService {
                         Comparator.nullsLast(Comparator.naturalOrder())
                 );
 
-        return patients.stream()
+        List<PatientResponse> responses = 
+        		patients.stream()
                 .sorted(byName)
                 .map(patientToResponse)
                 .toList();
+        
+        log.info("Returning {} patients" , responses.size()
+        		);
+        return responses;
     }
 
     // Get patient by ID
     @Override
     public PatientResponse getPatientById(Long id) {
-
+   
+    	
+    	  log.debug("Fetching patient: id={}", id);
+    	  
         Supplier<PatientNotFoundException> patientNotFound =
                 () -> new PatientNotFoundException(
                         "Patient not found with id: " + id
@@ -97,7 +121,8 @@ public class PatientServiceImpl implements PatientService {
     public PatientResponse updatePatient(
             Long id,
             PatientRequest request) {
-
+    
+    	 log.info("Updating patient: id={}", id);
         patientValidator.validate(request);
 
         Patient patient = patientRepository.findById(id)
@@ -115,6 +140,10 @@ public class PatientServiceImpl implements PatientService {
 
         Patient updatedPatient =
                 patientRepository.save(patient);
+        log.info(
+                "Patient updated successfully: id={}",
+                id
+        );
 
         return patientMapper.toResponse(updatedPatient);
     }
@@ -122,6 +151,8 @@ public class PatientServiceImpl implements PatientService {
     // Delete patient
     @Override
     public void deletePatient(Long id) {
+    	
+    	  log.info("Deleting patient: id={}", id);
 
         if (!patientRepository.existsById(id)) {
             throw new PatientNotFoundException(
@@ -130,12 +161,19 @@ public class PatientServiceImpl implements PatientService {
         }
 
         patientRepository.deleteById(id);
+        
+        log.info(
+                "Patient deleted successfully: id={}",
+                id);
     }
 
     // Get all active patients
     @Override
     public List<PatientResponse> getActivePatients() {
+   
+    	 log.debug("Fetching active patients");
 
+    	
         List<Patient> patients = patientRepository.findAll();
 
         Predicate<Patient> isActive =
