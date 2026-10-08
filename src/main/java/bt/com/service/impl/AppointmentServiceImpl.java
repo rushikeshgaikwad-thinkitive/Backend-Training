@@ -2,419 +2,562 @@ package bt.com.service.impl;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import bt.com.dto.request.AppointmentRequest;
-import bt.com.dto.response.AppointmentResponse;
-import bt.com.entity.Appointment;
-import bt.com.entity.Doctor;
-import bt.com.entity.Patient;
+import bt.com.dto.constants.Messages;
+import bt.com.dto.module.Appointment;
+import bt.com.dto.module.AppointmentCancellation;
+import bt.com.dto.projection.AppointmentView;
+import bt.com.entity.AppointmentEntity;
+import bt.com.entity.DoctorEntity;
+import bt.com.entity.PatientEntity;
 import bt.com.enums.AppointmentStatus;
 import bt.com.enums.CancelledBy;
 import bt.com.exception.AppointmentNotFoundException;
 import bt.com.exception.DoctorNotFoundException;
 import bt.com.exception.PatientNotFoundException;
-import bt.com.factory.AppointmentFactory;
-import bt.com.mapper.AppointmentMapper;
 import bt.com.repository.AppointmentRepository;
 import bt.com.repository.DoctorRepository;
 import bt.com.repository.PatientRepository;
 import bt.com.service.AppointmentService;
-import bt.com.validator.AppointmentValidator;
 
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor
-public class AppointmentServiceImpl implements AppointmentService {
+@Transactional
+public class AppointmentServiceImpl
+        implements AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
+
     private final PatientRepository patientRepository;
+
     private final DoctorRepository doctorRepository;
 
-    private final AppointmentMapper appointmentMapper;
-    private final AppointmentFactory appointmentFactory;
-    private final AppointmentValidator appointmentValidator;
+    public AppointmentServiceImpl(
+            AppointmentRepository appointmentRepository,
+            PatientRepository patientRepository,
+            DoctorRepository doctorRepository) {
 
-
-    @Override
-    public AppointmentResponse createAppointment(AppointmentRequest request) {
-
-        appointmentValidator.validate(request);
-
-        Patient patient = patientRepository.findById(request.getPatientId())
-                .orElseThrow(patientNotFoundException(request.getPatientId()));
-
-       
-        Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                .orElseThrow(doctorNotFoundException(request.getDoctorId()));
-
-      
-
-        Appointment appointment =
-                appointmentFactory.createAppointment(
-                        request,
-                        patient,
-                        doctor
-                );
-
-        Appointment savedAppointment =
-                appointmentRepository.save(appointment);
-
-  
-        return appointmentMapper.toResponse(savedAppointment);
+        this.appointmentRepository = appointmentRepository;
+        this.patientRepository = patientRepository;
+        this.doctorRepository = doctorRepository;
     }
 
+    @Override
+    public AppointmentView createAppointment(
+            Appointment appointment) {
 
+        log.info(Messages.CREATING_APPOINTMENT);
+
+        validateAppointmentDateTime(
+                appointment.getAppointmentDate(),
+                appointment.getAppointmentTime()
+        );
+
+        PatientEntity patient =
+                getPatient(appointment.getPatientId());
+
+        DoctorEntity doctor =
+                getDoctor(appointment.getDoctorId());
+
+        AppointmentEntity appointmentEntity =
+                AppointmentEntity.builder()
+                        .patient(patient)
+                        .doctor(doctor)
+                        .appointmentDate(
+                                appointment.getAppointmentDate()
+                        )
+                        .appointmentTime(
+                                appointment.getAppointmentTime()
+                        )
+                        .reason(
+                                appointment.getReason()
+                        )
+                        .notes(
+                                appointment.getNotes()
+                        )
+                        .status(
+                                AppointmentStatus.SCHEDULED
+                        )
+                        .build();
+
+        AppointmentEntity savedAppointment =
+                appointmentRepository.save(
+                        appointmentEntity
+                );
+
+        log.info(
+                Messages.APPOINTMENT_CREATED,
+                savedAppointment.getId()
+        );
+
+        return mapToView(savedAppointment);
+    }
 
     @Override
-    public List<AppointmentResponse> getAllAppointments() {
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getAllAppointments() {
 
-        Function<Appointment, AppointmentResponse> mapper =
-                appointmentMapper::toResponse;
-
-        Comparator<Appointment> sortByDateTime =
-                Comparator
-                        .comparing(Appointment::getAppointmentDate)
-                        .thenComparing(Appointment::getAppointmentTime);
+        log.debug(Messages.FETCHING_ALL_APPOINTMENTS);
 
         return appointmentRepository.findAll()
                 .stream()
-                .sorted(sortByDateTime)
-                .map(mapper)
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
                 .toList();
     }
 
-
     @Override
-    public AppointmentResponse getAppointmentById(Long appointmentId) {
+    @Transactional(readOnly = true)
+    public AppointmentView getAppointmentById(
+            Long id) {
 
-        Supplier<AppointmentNotFoundException> exceptionSupplier =
-                () -> new AppointmentNotFoundException(
-                        "Appointment not found with id: " + appointmentId
-                );
+        log.debug(
+                Messages.FETCHING_APPOINTMENT,
+                id
+        );
 
-        Appointment appointment =
-                appointmentRepository.findById(appointmentId)
-                        .orElseThrow(exceptionSupplier);
+        AppointmentEntity appointment =
+                getAppointment(id);
 
-        return appointmentMapper.toResponse(appointment);
+        return mapToView(appointment);
     }
 
-
-
     @Override
-    public List<AppointmentResponse> getAppointmentsByPatient(
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getAppointmentsByPatient(
             Long patientId) {
 
-        // Make sure patient exists
-        patientRepository.findById(patientId)
-                .orElseThrow(patientNotFoundException(patientId));
+        log.debug(
+                Messages.FETCHING_PATIENT_APPOINTMENTS,
+                patientId
+        );
 
-        return appointmentRepository.findByPatientId(patientId)
+        getPatient(patientId);
+
+        return appointmentRepository
+                .findByPatient_Id(patientId)
                 .stream()
-                .sorted(
-                        Comparator
-                                .comparing(Appointment::getAppointmentDate)
-                                .thenComparing(Appointment::getAppointmentTime)
-                )
-                .map(appointmentMapper::toResponse)
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
                 .toList();
     }
 
-
-
-
     @Override
-    public List<AppointmentResponse> getAppointmentsByDoctor(
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getAppointmentsByDoctor(
             Long doctorId) {
 
-        // Make sure doctor exists
-        doctorRepository.findById(doctorId)
-                .orElseThrow(doctorNotFoundException(doctorId));
+        log.debug(
+                Messages.FETCHING_DOCTOR_APPOINTMENTS,
+                doctorId
+        );
 
-        return appointmentRepository.findByDoctorId(doctorId)
+        getDoctor(doctorId);
+
+        return appointmentRepository
+                .findByDoctor_Id(doctorId)
                 .stream()
-                .sorted(
-                        Comparator
-                                .comparing(Appointment::getAppointmentDate)
-                                .thenComparing(Appointment::getAppointmentTime)
-                )
-                .map(appointmentMapper::toResponse)
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
                 .toList();
     }
 
-
-
     @Override
-    public List<AppointmentResponse> getAppointmentsByDate(
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getAppointmentsByDate(
             LocalDate date) {
 
-        return appointmentRepository.findByAppointmentDate(date)
+        log.debug(
+                Messages.FETCHING_DATE_APPOINTMENTS,
+                date
+        );
+
+        return appointmentRepository
+                .findByAppointmentDate(date)
                 .stream()
                 .sorted(
                         Comparator.comparing(
-                                Appointment::getAppointmentTime
+                                AppointmentEntity::getAppointmentTime
                         )
                 )
-                .map(appointmentMapper::toResponse)
+                .map(this::mapToView)
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getScheduledAppointments() {
+
+        log.debug(
+                Messages.FETCHING_SCHEDULED_APPOINTMENTS
+        );
+
+        return appointmentRepository
+                .findByStatus(
+                        AppointmentStatus.SCHEDULED
+                )
+                .stream()
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
+                .toList();
+    }
 
     @Override
-    public AppointmentResponse updateAppointment(
-            Long appointmentId,
-            AppointmentRequest request) {
+    public AppointmentView updateAppointment(
+            Long id,
+            Appointment appointment) {
 
-        // Validate request
-        appointmentValidator.validate(request);
+        log.info(
+                Messages.UPDATING_APPOINTMENT,
+                id
+        );
 
-        // Find existing appointment
-        Appointment appointment =
-                appointmentRepository.findById(appointmentId)
-                        .orElseThrow(
-                                () -> new AppointmentNotFoundException(
-                                        "Appointment not found with id: "
-                                                + appointmentId
-                                )
-                        );
+        AppointmentEntity existingAppointment =
+                getAppointment(id);
 
-        // Do not allow update of cancelled appointment
-        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+        if (existingAppointment.getStatus()
+                == AppointmentStatus.CANCELLED) {
+
             throw new IllegalStateException(
-                    "Cancelled appointment cannot be updated"
+                    Messages.CANCELLED_APPOINTMENT_CANNOT_UPDATE
             );
         }
 
-        // Find new patient
-        Patient patient =
-                patientRepository.findById(request.getPatientId())
-                        .orElseThrow(
-                                patientNotFoundException(
-                                        request.getPatientId()
-                                )
-                        );
-
-        // Find new doctor
-        Doctor doctor =
-                doctorRepository.findById(request.getDoctorId())
-                        .orElseThrow(
-                                doctorNotFoundException(
-                                        request.getDoctorId()
-                                )
-                        );
-
-        // Validate date/time
-        appointmentValidator.validateAppointmentDateTime(
-                request.getAppointmentDate(),
-                request.getAppointmentTime()
+        validateAppointmentDateTime(
+                appointment.getAppointmentDate(),
+                appointment.getAppointmentTime()
         );
 
-      
+        PatientEntity patient =
+                getPatient(appointment.getPatientId());
 
-        appointment.setPatient(patient);
-        appointment.setDoctor(doctor);
-        appointment.setAppointmentDate(
-                request.getAppointmentDate()
+        DoctorEntity doctor =
+                getDoctor(appointment.getDoctorId());
+
+        existingAppointment.setPatient(patient);
+
+        existingAppointment.setDoctor(doctor);
+
+        existingAppointment.setAppointmentDate(
+                appointment.getAppointmentDate()
         );
-        appointment.setAppointmentTime(
-                request.getAppointmentTime()
+
+        existingAppointment.setAppointmentTime(
+                appointment.getAppointmentTime()
         );
-        appointment.setReason(request.getReason());
-        appointment.setNotes(request.getNotes());
 
-        Appointment updatedAppointment =
-                appointmentRepository.save(appointment);
+        existingAppointment.setReason(
+                appointment.getReason()
+        );
 
-        return appointmentMapper.toResponse(updatedAppointment);
+        existingAppointment.setNotes(
+                appointment.getNotes()
+        );
+
+        AppointmentEntity updatedAppointment =
+                appointmentRepository.save(
+                        existingAppointment
+                );
+
+        log.info(
+                Messages.APPOINTMENT_UPDATED,
+                id
+        );
+
+        return mapToView(updatedAppointment);
     }
 
-
-
     @Override
-    public void deleteAppointment(Long appointmentId) {
+    public void deleteAppointment(Long id) {
 
-        if (!appointmentRepository.existsById(appointmentId)) {
-            throw new AppointmentNotFoundException(
-                    "Appointment not found with id: " + appointmentId
-            );
-        }
+        log.info(
+                Messages.DELETING_APPOINTMENT,
+                id
+        );
 
-        appointmentRepository.deleteById(appointmentId);
+        AppointmentEntity appointment =
+                getAppointment(id);
+
+        appointmentRepository.delete(appointment);
+
+        log.info(
+                Messages.APPOINTMENT_DELETED,
+                id
+        );
     }
 
-
     @Override
-    public AppointmentResponse completeAppointment(
+    public AppointmentView completeAppointment(
             Long appointmentId) {
 
-        Appointment appointment =
-                appointmentRepository.findById(appointmentId)
-                        .orElseThrow(
-                                () -> new AppointmentNotFoundException(
-                                        "Appointment not found with id: "
-                                                + appointmentId
-                                )
-                        );
+        log.info(
+                Messages.COMPLETING_APPOINTMENT,
+                appointmentId
+        );
 
-        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+        AppointmentEntity appointment =
+                getAppointment(appointmentId);
+
+        if (appointment.getStatus()
+                == AppointmentStatus.CANCELLED) {
+
             throw new IllegalStateException(
-                    "Cancelled appointment cannot be completed"
+                    Messages.CANCELLED_APPOINTMENT_CANNOT_COMPLETE
             );
         }
 
-        if (appointment.getStatus() == AppointmentStatus.COMPLETED) {
+        if (appointment.getStatus()
+                == AppointmentStatus.COMPLETED) {
+
             throw new IllegalStateException(
-                    "Appointment is already completed"
+                    Messages.APPOINTMENT_ALREADY_COMPLETED
             );
         }
 
-        appointment.setStatus(AppointmentStatus.COMPLETED);
+        appointment.setStatus(
+                AppointmentStatus.COMPLETED
+        );
 
-        Appointment updatedAppointment =
-                appointmentRepository.save(appointment);
+        AppointmentEntity updatedAppointment =
+                appointmentRepository.save(
+                        appointment
+                );
 
-        return appointmentMapper.toResponse(updatedAppointment);
+        log.info(
+                Messages.APPOINTMENT_COMPLETED,
+                appointmentId
+        );
+
+        return mapToView(updatedAppointment);
     }
 
-
-
     @Override
-    public AppointmentResponse cancelAppointmentByPatient(
+    public AppointmentView cancelAppointmentByPatient(
             Long appointmentId,
-            String reason) {
+            AppointmentCancellation cancellation) {
 
-        Appointment appointment =
-                getAppointmentEntity(appointmentId);
-
-        validateCanBeCancelled(appointment);
-
-        appointment.setStatus(AppointmentStatus.CANCELLED);
-
-        appointment.setCancelledBy(
+        return cancelAppointment(
+                appointmentId,
+                cancellation,
                 CancelledBy.PATIENT
         );
+    }
 
-        appointment.setCancellationReason(reason);
+    @Override
+    public AppointmentView cancelAppointmentByDoctor(
+            Long appointmentId,
+            AppointmentCancellation cancellation) {
 
-        appointment.setCancelledAt(
-                Instant.now()
-        );
-
-        Appointment cancelledAppointment =
-                appointmentRepository.save(appointment);
-
-        return appointmentMapper.toResponse(
-                cancelledAppointment
+        return cancelAppointment(
+                appointmentId,
+                cancellation,
+                CancelledBy.DOCTOR
         );
     }
 
-
- 
-
-    @Override
-    public AppointmentResponse cancelAppointmentByDoctor(
+    private AppointmentView cancelAppointment(
             Long appointmentId,
-            String reason) {
+            AppointmentCancellation cancellation,
+            CancelledBy cancelledBy) {
 
-        Appointment appointment =
-                getAppointmentEntity(appointmentId);
+        log.info(
+                Messages.CANCELLING_APPOINTMENT,
+                appointmentId
+        );
+
+        AppointmentEntity appointment =
+                getAppointment(appointmentId);
 
         validateCanBeCancelled(appointment);
 
-        appointment.setStatus(AppointmentStatus.CANCELLED);
-
-        appointment.setCancelledBy(
-                CancelledBy.DOCTOR
+        appointment.setStatus(
+                AppointmentStatus.CANCELLED
         );
 
-        appointment.setCancellationReason(reason);
+        appointment.setCancelledBy(
+                cancelledBy
+        );
+
+        appointment.setCancellationReason(
+                cancellation.getCancellationReason()
+        );
 
         appointment.setCancelledAt(
                 Instant.now()
         );
 
-        Appointment cancelledAppointment =
-                appointmentRepository.save(appointment);
+        AppointmentEntity cancelledAppointment =
+                appointmentRepository.save(
+                        appointment
+                );
 
-        return appointmentMapper.toResponse(
-                cancelledAppointment
+        log.info(
+                Messages.APPOINTMENT_CANCELLED,
+                appointmentId
         );
+
+        return mapToView(cancelledAppointment);
     }
 
+    private AppointmentEntity getAppointment(
+            Long id) {
 
-    @Override
-    public List<AppointmentResponse> getScheduledAppointments() {
-
-        Predicate<Appointment> isScheduled =
-                appointment ->
-                        appointment.getStatus()
-                                == AppointmentStatus.SCHEDULED;
-
-        return appointmentRepository.findAll()
-                .stream()
-                .filter(isScheduled)
-                .sorted(
-                        Comparator
-                                .comparing(
-                                        Appointment::getAppointmentDate
-                                )
-                                .thenComparing(
-                                        Appointment::getAppointmentTime
-                                )
-                )
-                .map(appointmentMapper::toResponse)
-                .toList();
-    }
-
-
-    private Appointment getAppointmentEntity(
-            Long appointmentId) {
-
-        return appointmentRepository.findById(appointmentId)
+        return appointmentRepository.findById(id)
                 .orElseThrow(
                         () -> new AppointmentNotFoundException(
-                                "Appointment not found with id: "
-                                        + appointmentId
+                                String.format(
+                                        Messages.APPOINTMENT_NOT_FOUND,
+                                        id
+                                )
                         )
                 );
     }
 
+    private PatientEntity getPatient(
+            Long patientId) {
+
+        return patientRepository.findById(patientId)
+                .orElseThrow(
+                        () -> new PatientNotFoundException(
+                                String.format(
+                                        Messages.PATIENT_NOT_FOUND,
+                                        patientId
+                                )
+                        )
+                );
+    }
+
+    private DoctorEntity getDoctor(
+            Long doctorId) {
+
+        return doctorRepository.findById(doctorId)
+                .orElseThrow(
+                        () -> new DoctorNotFoundException(
+                                String.format(
+                                        Messages.DOCTOR_NOT_FOUND,
+                                        doctorId
+                                )
+                        )
+                );
+    }
 
     private void validateCanBeCancelled(
-            Appointment appointment) {
+            AppointmentEntity appointment) {
 
         if (appointment.getStatus()
                 != AppointmentStatus.SCHEDULED) {
 
             throw new IllegalStateException(
-                    "Only scheduled appointments can be cancelled"
+                    Messages.ONLY_SCHEDULED_CAN_CANCEL
             );
         }
     }
 
+    private void validateAppointmentDateTime(
+            LocalDate appointmentDate,
+            LocalTime appointmentTime) {
 
-    private Supplier<PatientNotFoundException>
-    patientNotFoundException(Long patientId) {
+        LocalDate today = LocalDate.now();
+        LocalTime currentTime = LocalTime.now();
 
-        return () -> new PatientNotFoundException(
-                "Patient not found with id: " + patientId
-        );
+        if (appointmentDate.isBefore(today)) {
+
+            throw new IllegalArgumentException(
+                    Messages.APPOINTMENT_DATE_PAST
+            );
+        }
+
+        if (appointmentDate.equals(today)
+                && appointmentTime.isBefore(currentTime)) {
+
+            throw new IllegalArgumentException(
+                    Messages.APPOINTMENT_TIME_PAST
+            );
+        }
     }
 
+    private Comparator<AppointmentEntity>
+    appointmentComparator() {
 
-    private Supplier<DoctorNotFoundException>
-    doctorNotFoundException(Long doctorId) {
+        return Comparator
+                .comparing(
+                        AppointmentEntity::getAppointmentDate
+                )
+                .thenComparing(
+                        AppointmentEntity::getAppointmentTime
+                );
+    }
 
-        return () -> new DoctorNotFoundException(
-                "Doctor not found with id: " + doctorId
-        );
+    private AppointmentView mapToView(
+            AppointmentEntity appointment) {
+
+        return AppointmentView.builder()
+                .id(appointment.getId())
+
+                .patientId(
+                        appointment.getPatient().getId()
+                )
+
+                .patientName(
+                        appointment.getPatient().getName()
+                )
+
+                .doctorId(
+                        appointment.getDoctor().getId()
+                )
+
+                .doctorName(
+                        appointment.getDoctor().getName()
+                )
+
+                .appointmentDate(
+                        appointment.getAppointmentDate()
+                )
+
+                .appointmentTime(
+                        appointment.getAppointmentTime()
+                )
+
+                .reason(
+                        appointment.getReason()
+                )
+
+                .status(
+                        appointment.getStatus()
+                )
+
+                .notes(
+                        appointment.getNotes()
+                )
+
+                .cancelledBy(
+                        appointment.getCancelledBy()
+                )
+
+                .cancellationReason(
+                        appointment.getCancellationReason()
+                )
+
+                .cancelledAt(
+                        appointment.getCancelledAt()
+                )
+
+                .createdAt(
+                        appointment.getCreatedAt()
+                )
+
+                .updatedAt(
+                        appointment.getUpdatedAt()
+                )
+
+                .build();
     }
 }

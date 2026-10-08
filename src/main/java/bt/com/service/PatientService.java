@@ -4,36 +4,22 @@ package bt.com.service;
 
 import java.util.List;
 
-import bt.com.dto.request.PatientRequest;
-import bt.com.dto.response.PatientResponse;
+import bt.com.dto.module.Patient;
+import bt.com.dto.projection.PatientView;
+;
 
 public interface PatientService {
-	PatientResponse createPatient(PatientRequest request);
+	 PatientView createPatient(Patient patient);
 
-    List<PatientResponse> getAllPatients();
+	    List<PatientView> getAllPatients();
 
-    PatientResponse getPatientById(Long id);
+	    PatientView getPatientById(Long id);
 
-    PatientResponse updatePatient(
-            Long id,
-            PatientRequest request
-    );
+	    PatientView updatePatient(Long id, Patient patient);
 
-    void deletePatient(Long id);
+	    void deletePatient(Long id);
 
-    List<PatientResponse> getActivePatients();
-	
-
-    // default method
-    default void printServiceName() {
-        System.out.println("Patient Service");
-    }
-
-
-    // static method to check valid age
-    static boolean isValidAge(int age) {
-        return age > 0 && age <= 120;
-    }
+	    List<PatientView> getActivePatients();
 
 	
 	

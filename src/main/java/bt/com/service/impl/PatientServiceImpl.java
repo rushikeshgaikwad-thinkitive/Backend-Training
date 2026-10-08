@@ -3,22 +3,21 @@ package bt.com.service.impl;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+
 
 import org.springframework.stereotype.Service;
 
-import bt.com.dto.request.PatientRequest;
-import bt.com.dto.response.PatientResponse;
-import bt.com.entity.Patient;
+import bt.com.dto.constants.Messages;
+import bt.com.dto.module.Patient;
+import bt.com.dto.projection.PatientView;
+
+import bt.com.entity.PatientEntity;
 import bt.com.exception.PatientNotFoundException;
-import bt.com.factory.PatientFactory;
-import bt.com.mapper.PatientMapper;
+
 import bt.com.repository.PatientRepository;
 import bt.com.service.PatientService;
-import bt.com.validator.PatientValidator;
+
+import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -26,184 +25,201 @@ import lombok.extern.slf4j.Slf4j;
 public class PatientServiceImpl implements PatientService {
 
     private final PatientRepository patientRepository;
-    private final PatientMapper patientMapper;
-    private final PatientValidator patientValidator;
-    private final PatientFactory patientFactory;
 
     public PatientServiceImpl(
-            PatientRepository patientRepository,
-            PatientMapper patientMapper,
-            PatientValidator patientValidator,
-            PatientFactory patientFactory) {
-
-        this.patientRepository = patientRepository;
-        this.patientMapper = patientMapper;
-        this.patientValidator = patientValidator;
-        this.patientFactory = patientFactory;
+            PatientRepository patientRepository) {
+        this.patientRepository = patientRepository;     
     }
-
-    // Create patient
     @Override
-    public PatientResponse createPatient(PatientRequest request) {
+    public PatientView createPatient(Patient patient) {
 
-    	 log.info("Creating new patient");
-     
-        patientValidator.validate(request);
-        
-      
+        log.info(Messages.CREATING_PATIENT);
 
-        
-        Patient patient = patientFactory.createPatient(request);
-        
-        
+        PatientEntity patientEntity =
+                mapToEntity(patient);
 
-        Patient savedPatient = patientRepository.save(patient);
-        
+        PatientEntity savedPatient =
+                patientRepository.save(patientEntity);
+
         log.info(
-                "Patient created successfully with id: {}",
+                Messages.PATIENT_CREATED,
                 savedPatient.getId()
         );
 
-        return patientMapper.toResponse(savedPatient);
+        return mapToView(savedPatient);
     }
 
-    // Get all patients
     @Override
-    public List<PatientResponse> getAllPatients() {
-    	
-    	   log.info("Fetching all patients");
+    @Transactional(readOnly = true)
+    public List<PatientView> getAllPatients() {
 
-        List<Patient> patients = patientRepository.findAll();
-        
-       
+        log.debug(Messages.FETCHING_ALL_PATIENTS);
 
-        Function<Patient, PatientResponse> patientToResponse =
-                patientMapper::toResponse;
-
-        // Sort patients by name
-        Comparator<Patient> byName =
-                Comparator.comparing(
-                        Patient::getName,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                );
-
-        List<PatientResponse> responses = 
-        		patients.stream()
-                .sorted(byName)
-                .map(patientToResponse)
+        return patientRepository.findAll()
+                .stream()
+                .sorted(
+                        Comparator.comparing(
+                                PatientEntity::getName,
+                                Comparator.nullsLast(
+                                        Comparator.naturalOrder()
+                                )
+                        )
+                )
+                .map(this::mapToView)
                 .toList();
-        
-        log.info("Returning {} patients" , responses.size()
-        		);
-        return responses;
     }
 
-    // Get patient by ID
     @Override
-    public PatientResponse getPatientById(Long id) {
-   
-    	
-    	  log.debug("Fetching patient: id={}", id);
-    	  
-        Supplier<PatientNotFoundException> patientNotFound =
-                () -> new PatientNotFoundException(
-                        "Patient not found with id: " + id
-                );
+    @Transactional(readOnly = true)
+    public PatientView getPatientById(Long id) {
 
-        Patient patient = patientRepository.findById(id)
-                .orElseThrow(patientNotFound);
-
-        return patientMapper.toResponse(patient);
-    }
-
-    // Update patient
-    @Override
-    public PatientResponse updatePatient(
-            Long id,
-            PatientRequest request) {
-    
-    	 log.info("Updating patient: id={}", id);
-        patientValidator.validate(request);
-
-        Patient patient = patientRepository.findById(id)
-                .orElseThrow(() ->
-                        new PatientNotFoundException(
-                                "Patient not found with id: " + id
-                        ));
-
-        patient.setName(request.getName());
-        patient.setDateOfBirth(request.getDateOfBirth());
-        patient.setGender(request.getGender());
-        patient.setPhone(request.getPhone());
-        patient.setEmail(request.getEmail());
-        patient.setActive(request.isActive());
-
-        Patient updatedPatient =
-                patientRepository.save(patient);
-        log.info(
-                "Patient updated successfully: id={}",
+        log.debug(
+                Messages.FETCHING_PATIENT,
                 id
         );
 
-        return patientMapper.toResponse(updatedPatient);
+        PatientEntity patient =
+                patientRepository.findById(id)
+                        .orElseThrow(
+                                () -> new PatientNotFoundException(
+                                        Messages.PATIENT_NOT_FOUND + id
+                                )
+                        );
+
+        return mapToView(patient);
     }
 
-    // Delete patient
+    @Override
+    public PatientView updatePatient(
+            Long id,
+            Patient patient) {
+
+        log.info(
+                Messages.UPDATING_PATIENT,
+                id
+        );
+
+        PatientEntity existingPatient =
+                patientRepository.findById(id)
+                        .orElseThrow(
+                                () -> new PatientNotFoundException(
+                                        Messages.PATIENT_NOT_FOUND + id
+                                )
+                        );
+
+        existingPatient.setName(
+                patient.getName()
+        );
+
+        existingPatient.setAge(
+                patient.getAge()
+        );
+
+        existingPatient.setGender(
+                patient.getGender()
+        );
+
+        existingPatient.setPhone(
+                patient.getPhone()
+        );
+
+        existingPatient.setEmail(
+                patient.getEmail()
+        );
+
+        existingPatient.setActive(
+                Boolean.TRUE.equals(
+                        patient.getActive()
+                )
+        );
+
+        PatientEntity updatedPatient =
+                patientRepository.save(existingPatient);
+
+        log.info(
+                Messages.PATIENT_UPDATED,
+                updatedPatient.getId()
+        );
+
+        return mapToView(updatedPatient);
+    }
+
     @Override
     public void deletePatient(Long id) {
-    	
-    	  log.info("Deleting patient: id={}", id);
 
-        if (!patientRepository.existsById(id)) {
-            throw new PatientNotFoundException(
-                    "Patient not found with id: " + id
-            );
-        }
-
-        patientRepository.deleteById(id);
-        
         log.info(
-                "Patient deleted successfully: id={}",
-                id);
+                Messages.DELETING_PATIENT,
+                id
+        );
+
+        PatientEntity patient =
+                patientRepository.findById(id)
+                        .orElseThrow(
+                                () -> new PatientNotFoundException(
+                                        Messages.PATIENT_NOT_FOUND + id
+                                )
+                        );
+
+        patientRepository.delete(patient);
+
+        log.info(
+                Messages.PATIENT_DELETED,
+                id
+        );
     }
 
-    // Get all active patients
     @Override
-    public List<PatientResponse> getActivePatients() {
-   
-    	 log.debug("Fetching active patients");
+    @Transactional(readOnly = true)
+    public List<PatientView> getActivePatients() {
 
-    	
-        List<Patient> patients = patientRepository.findAll();
+        log.debug(
+                Messages.FETCHING_ACTIVE_PATIENTS
+        );
 
-        Predicate<Patient> isActive =
-                Patient::isActive;
-
-        Comparator<Patient> byName =
-                Comparator.comparing(
-                        Patient::getName,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                );
-
-        return patients.stream()
-                .filter(isActive)
-                .sorted(byName)
-                .map(patientMapper::toResponse)
+        return patientRepository.findByActiveTrue()
+                .stream()
+                .sorted(
+                        Comparator.comparing(
+                                PatientEntity::getName,
+                                Comparator.nullsLast(
+                                        Comparator.naturalOrder()
+                                )
+                        )
+                )
+                .map(this::mapToView)
                 .toList();
     }
 
-    // Consumer function
-    public void logAllPatients() {
+    private PatientEntity mapToEntity(
+            Patient patient) {
 
-        List<Patient> patients = patientRepository.findAll();
+        return PatientEntity.builder()
+                .name(patient.getName())
+                .age(patient.getAge())
+                .gender(patient.getGender())
+                .phone(patient.getPhone())
+                .email(patient.getEmail())
+                .active(
+                        Boolean.TRUE.equals(
+                                patient.getActive()
+                        )
+                )
+                .build();
+    }
 
-        Consumer<Patient> printPatient =
-                patient -> System.out.println(
-                        "Patient ID: " + patient.getId()
-                                + ", Name: " + patient.getName()
-                                + ", DOB: " + patient.getDateOfBirth()
-                );
+    private PatientView mapToView(
+            PatientEntity patient) {
 
-        patients.forEach(printPatient);
+        return PatientView.builder()
+                .id(patient.getId())
+                .name(patient.getName())
+                .age(patient.getAge())
+                .gender(patient.getGender())
+                .phone(patient.getPhone())
+                .email(patient.getEmail())
+                .active(patient.isActive())
+                .createdAt(patient.getCreatedAt())
+                .updatedAt(patient.getUpdatedAt())
+                .build();
     }
 }

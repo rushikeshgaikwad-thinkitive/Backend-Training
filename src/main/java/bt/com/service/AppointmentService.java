@@ -3,55 +3,58 @@ package bt.com.service;
 import java.time.LocalDate;
 import java.util.List;
 
-import bt.com.dto.request.AppointmentRequest;
-import bt.com.dto.response.AppointmentResponse;
+import bt.com.dto.module.Appointment;
+import bt.com.dto.module.AppointmentCancellation;
+import bt.com.dto.projection.AppointmentView;
+
 
 public interface AppointmentService {
 
-    AppointmentResponse createAppointment(
-            AppointmentRequest request
+
+    AppointmentView createAppointment(
+            Appointment appointment
     );
 
-    List<AppointmentResponse> getAllAppointments();
+    List<AppointmentView> getAllAppointments();
 
-    AppointmentResponse getAppointmentById(
+    AppointmentView getAppointmentById(
             Long id
     );
 
-    AppointmentResponse updateAppointment(
+    AppointmentView updateAppointment(
             Long id,
-            AppointmentRequest request
+            Appointment appointment
     );
 
     void deleteAppointment(
             Long id
     );
 
-    AppointmentResponse cancelAppointmentByPatient(
+    AppointmentView cancelAppointmentByPatient(
             Long appointmentId,
-            String reason
+            AppointmentCancellation cancellation
     );
 
-    AppointmentResponse cancelAppointmentByDoctor(
+    AppointmentView cancelAppointmentByDoctor(
             Long appointmentId,
-            String reason
+            AppointmentCancellation cancellation
     );
 
-    AppointmentResponse completeAppointment(
+    AppointmentView completeAppointment(
             Long appointmentId
     );
 
-    List<AppointmentResponse> getAppointmentsByPatient(
+    List<AppointmentView> getAppointmentsByPatient(
             Long patientId
     );
 
-    List<AppointmentResponse> getAppointmentsByDoctor(
+    List<AppointmentView> getAppointmentsByDoctor(
             Long doctorId
     );
 
-    List<AppointmentResponse> getAppointmentsByDate(
+    List<AppointmentView> getAppointmentsByDate(
             LocalDate date
     );
 
-    List<AppointmentResponse> getScheduledAppointments();
+    List<AppointmentView> getScheduledAppointments();
 }

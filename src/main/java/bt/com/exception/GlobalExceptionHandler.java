@@ -1,160 +1,186 @@
 package bt.com.exception;
 
-import bt.com.dto.response.ErrorResponse;
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
+import java.time.Instant;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.Instant;
+import bt.com.dto.constants.Literals;
+import bt.com.dto.constants.Messages;
+import bt.com.dto.projection.ErrorView;
+
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(PatientNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handlePatientNotFound(
+    public ResponseEntity<ErrorView> handlePatientNotFound(
             PatientNotFoundException ex,
             HttpServletRequest request) {
 
         log.warn(
-                "Patient not found: path={}, message={}",
+                Messages.PATIENT_NOT_FOUND_LOG,
                 request.getRequestURI(),
                 ex.getMessage()
         );
 
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(Instant.now())
-                .status(HttpStatus.NOT_FOUND.value())
-                .error("PATIENT_NOT_FOUND")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(response);
+        return buildErrorResponse(
+                HttpStatus.NOT_FOUND,
+                Literals.ERROR_PATIENT_NOT_FOUND,
+                ex.getMessage(),
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler(DoctorNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleDoctorNotFound(
+    public ResponseEntity<ErrorView> handleDoctorNotFound(
             DoctorNotFoundException ex,
             HttpServletRequest request) {
 
         log.warn(
-                "Doctor not found: path={}, message={}",
+                Messages.DOCTOR_NOT_FOUND_LOG,
                 request.getRequestURI(),
                 ex.getMessage()
         );
 
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(Instant.now())
-                .status(HttpStatus.NOT_FOUND.value())
-                .error("DOCTOR_NOT_FOUND")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(response);
+        return buildErrorResponse(
+                HttpStatus.NOT_FOUND,
+                Literals.ERROR_DOCTOR_NOT_FOUND,
+                ex.getMessage(),
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler(AppointmentNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleAppointmentNotFound(
+    public ResponseEntity<ErrorView>
+    handleAppointmentNotFound(
             AppointmentNotFoundException ex,
             HttpServletRequest request) {
 
         log.warn(
-                "Appointment not found: path={}, message={}",
+                Messages.APPOINTMENT_NOT_FOUND_LOG,
                 request.getRequestURI(),
                 ex.getMessage()
         );
 
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(Instant.now())
-                .status(HttpStatus.NOT_FOUND.value())
-                .error("APPOINTMENT_NOT_FOUND")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
+        return buildErrorResponse(
+                HttpStatus.NOT_FOUND,
+                Literals.ERROR_APPOINTMENT_NOT_FOUND,
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+    }
 
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(response);
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorView> handleValidation(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
+
+        String message = ex
+                .getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .findFirst()
+                .map(error -> error.getDefaultMessage())
+                .orElse(Messages.INVALID_REQUEST);
+
+        log.warn(
+                Messages.INVALID_REQUEST_LOG,
+                request.getRequestURI(),
+                message
+        );
+
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                Literals.ERROR_INVALID_REQUEST,
+                message,
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(
+    public ResponseEntity<ErrorView>
+    handleIllegalArgument(
             IllegalArgumentException ex,
             HttpServletRequest request) {
 
         log.warn(
-                "Invalid request: path={}, message={}",
+                Messages.INVALID_REQUEST_LOG,
                 request.getRequestURI(),
                 ex.getMessage()
         );
 
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(Instant.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("INVALID_REQUEST")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(response);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                Literals.ERROR_INVALID_REQUEST,
+                ex.getMessage(),
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalState(
+    public ResponseEntity<ErrorView>
+    handleIllegalState(
             IllegalStateException ex,
             HttpServletRequest request) {
 
         log.warn(
-                "Invalid business operation: path={}, message={}",
+                Messages.INVALID_STATE_LOG,
                 request.getRequestURI(),
                 ex.getMessage()
         );
 
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(Instant.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error("INVALID_STATE")
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(response);
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
+                Literals.ERROR_INVALID_STATE,
+                ex.getMessage(),
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnexpectedException(
+    public ResponseEntity<ErrorView>
+    handleUnexpectedException(
             Exception ex,
             HttpServletRequest request) {
 
         log.error(
-                "Unexpected application error: path={}",
+                Messages.UNEXPECTED_ERROR_LOG,
                 request.getRequestURI(),
                 ex
         );
 
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(Instant.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("INTERNAL_SERVER_ERROR")
-                .message("An unexpected error occurred")
-                .path(request.getRequestURI())
-                .build();
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                Literals.ERROR_INTERNAL_SERVER,
+                Messages.INTERNAL_SERVER_ERROR,
+                request.getRequestURI()
+        );
+    }
+
+    private ResponseEntity<ErrorView> buildErrorResponse(
+            HttpStatus status,
+            String error,
+            String message,
+            String path) {
+
+        ErrorView response =
+                ErrorView.builder()
+                        .timestamp(Instant.now())
+                        .status(status.value())
+                        .error(error)
+                        .message(message)
+                        .path(path)
+                        .build();
 
         return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .status(status)
                 .body(response);
     }
 }

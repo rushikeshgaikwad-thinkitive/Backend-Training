@@ -15,7 +15,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,12 +23,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Table(name = "appointment")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Appointment extends Auditable {
+public class AppointmentEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,14 +40,14 @@ public class Appointment extends Auditable {
             name = "patient_id",
             nullable = false
     )
-    private Patient patient;
+    private PatientEntity patient;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "doctor_id",
             nullable = false
     )
-    private Doctor doctor;
+    private DoctorEntity doctor;
 
     private LocalDate appointmentDate;
 
