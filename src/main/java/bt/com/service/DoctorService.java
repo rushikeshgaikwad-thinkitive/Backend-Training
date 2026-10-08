@@ -2,20 +2,21 @@ package bt.com.service;
 
 import java.util.List;
 
-import bt.com.dto.request.DoctorRequest;
-import bt.com.dto.response.DoctorResponse;
+import bt.com.dto.module.Doctor;
+import bt.com.dto.projection.DoctorView;
+;
 
 public interface DoctorService {
 
-    DoctorResponse createDoctor(DoctorRequest request);
+      DoctorView createDoctor(Doctor doctor);
 
-    List<DoctorResponse> getAllDoctors();
+    List<DoctorView> getAllDoctors();
 
-    DoctorResponse getDoctorById(Long id);
+    DoctorView getDoctorById(Long id);
 
-    DoctorResponse updateDoctor(Long id, DoctorRequest request);
+    DoctorView updateDoctor(Long id, Doctor doctor);
 
     void deleteDoctor(Long id);
 
-    List<DoctorResponse> getActiveDoctors();
+    List<DoctorView> getActiveDoctors();
 }

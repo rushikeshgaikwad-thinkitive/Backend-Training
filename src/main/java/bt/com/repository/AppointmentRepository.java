@@ -4,22 +4,28 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import bt.com.entity.Appointment;
+import bt.com.entity.AppointmentEntity;
+import bt.com.enums.AppointmentStatus;
 
 @Repository
 public interface AppointmentRepository
-        extends JpaRepository<Appointment, Long> {
+        extends JpaRepository<AppointmentEntity, Long> {
 
-    @Query("SELECT a FROM Appointment a WHERE a.patient.id = :patientId")
-    List<Appointment> findByPatientId(Long patientId);
+    List<AppointmentEntity> findByPatient_Id(
+            Long patientId
+    );
 
-    @Query("SELECT a FROM Appointment a WHERE a.doctor.id = :doctorId")
-    List<Appointment> findByDoctorId(Long doctorId);
+    List<AppointmentEntity> findByDoctor_Id(
+            Long doctorId
+    );
 
-    List<Appointment> findByAppointmentDate(
+    List<AppointmentEntity> findByAppointmentDate(
             LocalDate appointmentDate
+    );
+
+    List<AppointmentEntity> findByStatus(
+            AppointmentStatus status
     );
 }

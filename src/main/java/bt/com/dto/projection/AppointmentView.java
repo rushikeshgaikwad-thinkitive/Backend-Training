@@ -1,4 +1,4 @@
-package bt.com.dto.response;
+package bt.com.dto.projection;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -6,16 +6,15 @@ import java.time.LocalTime;
 
 import bt.com.enums.AppointmentStatus;
 import bt.com.enums.CancelledBy;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class AppointmentResponse {
+public class AppointmentView {
 
     private Long id;
 
@@ -42,4 +41,8 @@ public class AppointmentResponse {
     private String cancellationReason;
 
     private Instant cancelledAt;
+
+    private Instant createdAt;
+
+    private Instant updatedAt;
 }

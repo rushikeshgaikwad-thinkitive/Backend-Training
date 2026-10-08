@@ -4,145 +4,175 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import bt.com.dto.request.AppointmentRequest;
-import bt.com.dto.request.CancelAppointmentRequest;
-import bt.com.dto.response.AppointmentResponse;
+import bt.com.dto.constants.Literals;
+import bt.com.dto.module.Appointment;
+import bt.com.dto.module.AppointmentCancellation;
+import bt.com.dto.projection.AppointmentView;
 import bt.com.service.AppointmentService;
-
-import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/appointments")
-@RequiredArgsConstructor
+@RequestMapping(Literals.API_APPOINTMENTS)
+@Validated
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
 
+    public AppointmentController(
+            AppointmentService appointmentService) {
 
-    // CREATE
+        this.appointmentService = appointmentService;
+    }
+
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public AppointmentResponse createAppointment(
-            @RequestBody AppointmentRequest request) {
+    public ResponseEntity<AppointmentView> createAppointment(
+            @Valid @RequestBody Appointment appointment) {
 
-        return appointmentService.createAppointment(request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(
+                        appointmentService.createAppointment(
+                                appointment
+                        )
+                );
     }
 
-
-    // GET ALL
     @GetMapping
-    public List<AppointmentResponse> getAllAppointments() {
+    public ResponseEntity<List<AppointmentView>>
+    getAllAppointments() {
 
-        return appointmentService.getAllAppointments();
+        return ResponseEntity.ok(
+                appointmentService.getAllAppointments()
+        );
     }
 
-
-    // GET BY ID
     @GetMapping("/{id}")
-    public AppointmentResponse getAppointmentById(
+    public ResponseEntity<AppointmentView>
+    getAppointmentById(
             @PathVariable Long id) {
 
-        return appointmentService.getAppointmentById(id);
+        return ResponseEntity.ok(
+                appointmentService.getAppointmentById(id)
+        );
     }
 
-
-    // GET BY PATIENT
     @GetMapping("/patient/{patientId}")
-    public List<AppointmentResponse> getAppointmentsByPatient(
+    public ResponseEntity<List<AppointmentView>>
+    getAppointmentsByPatient(
             @PathVariable Long patientId) {
 
-        return appointmentService.getAppointmentsByPatient(
-                patientId
+        return ResponseEntity.ok(
+                appointmentService.getAppointmentsByPatient(
+                        patientId
+                )
         );
     }
 
-
-    // GET BY DOCTOR
     @GetMapping("/doctor/{doctorId}")
-    public List<AppointmentResponse> getAppointmentsByDoctor(
+    public ResponseEntity<List<AppointmentView>>
+    getAppointmentsByDoctor(
             @PathVariable Long doctorId) {
 
-        return appointmentService.getAppointmentsByDoctor(
-                doctorId
+        return ResponseEntity.ok(
+                appointmentService.getAppointmentsByDoctor(
+                        doctorId
+                )
         );
     }
 
-
-    // GET BY DATE
     @GetMapping("/date/{date}")
-    public List<AppointmentResponse> getAppointmentsByDate(
+    public ResponseEntity<List<AppointmentView>>
+    getAppointmentsByDate(
             @PathVariable LocalDate date) {
 
-        return appointmentService.getAppointmentsByDate(
-                date
+        return ResponseEntity.ok(
+                appointmentService.getAppointmentsByDate(
+                        date
+                )
         );
     }
 
-
-    // GET SCHEDULED
     @GetMapping("/scheduled")
-    public List<AppointmentResponse> getScheduledAppointments() {
+    public ResponseEntity<List<AppointmentView>>
+    getScheduledAppointments() {
 
-        return appointmentService.getScheduledAppointments();
-    }
-
-
-    // UPDATE
-    @PutMapping("/{id}")
-    public AppointmentResponse updateAppointment(
-            @PathVariable Long id,
-            @RequestBody AppointmentRequest request) {
-
-        return appointmentService.updateAppointment(
-                id,
-                request
+        return ResponseEntity.ok(
+                appointmentService.getScheduledAppointments()
         );
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<AppointmentView>
+    updateAppointment(
+            @PathVariable Long id,
+            @Valid @RequestBody Appointment appointment) {
 
-    // COMPLETE
+        return ResponseEntity.ok(
+                appointmentService.updateAppointment(
+                        id,
+                        appointment
+                )
+        );
+    }
+
     @PatchMapping("/{id}/complete")
-    public AppointmentResponse completeAppointment(
+    public ResponseEntity<AppointmentView>
+    completeAppointment(
             @PathVariable Long id) {
 
-        return appointmentService.completeAppointment(id);
+        return ResponseEntity.ok(
+                appointmentService.completeAppointment(id)
+        );
     }
 
-
-    // CANCEL BY PATIENT
     @PatchMapping("/{id}/cancel/patient")
-    public AppointmentResponse cancelByPatient(
+    public ResponseEntity<AppointmentView>
+    cancelByPatient(
             @PathVariable Long id,
-            @RequestBody CancelAppointmentRequest request) {
+            @Valid @RequestBody
+            AppointmentCancellation cancellation) {
 
-        return appointmentService.cancelAppointmentByPatient(
-                id,
-                request.getCancellationReason()
+        return ResponseEntity.ok(
+                appointmentService.cancelAppointmentByPatient(
+                        id,
+                        cancellation
+                )
         );
     }
 
-
-    // CANCEL BY DOCTOR
     @PatchMapping("/{id}/cancel/doctor")
-    public AppointmentResponse cancelByDoctor(
+    public ResponseEntity<AppointmentView>
+    cancelByDoctor(
             @PathVariable Long id,
-            @RequestBody CancelAppointmentRequest request) {
+            @Valid @RequestBody
+            AppointmentCancellation cancellation) {
 
-        return appointmentService.cancelAppointmentByDoctor(
-                id,
-                request.getCancellationReason()
+        return ResponseEntity.ok(
+                appointmentService.cancelAppointmentByDoctor(
+                        id,
+                        cancellation
+                )
         );
     }
 
-
-    // DELETE
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteAppointment(
+    public ResponseEntity<Void> deleteAppointment(
             @PathVariable Long id) {
 
         appointmentService.deleteAppointment(id);
+
+        return ResponseEntity.noContent().build();
     }
 }

@@ -1,17 +1,15 @@
-package bt.com.dto.response;
+package bt.com.dto.projection;
 
 import java.time.Instant;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @Getter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class DoctorResponse {
+public class DoctorView {
 
     private Long id;
 
@@ -24,8 +22,8 @@ public class DoctorResponse {
     private String email;
 
     private boolean active;
-    
+
     private Instant createdAt;
-    
+
     private Instant updatedAt;
 }
