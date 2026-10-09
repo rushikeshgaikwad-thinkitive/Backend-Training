@@ -6,6 +6,7 @@ import bt.com.dto.constants.Literals;
 import bt.com.dto.module.Patient;
 import bt.com.dto.projection.PatientView;
 import bt.com.service.PatientService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@SecurityRequirement(name = "bearerAuth")
 @RequestMapping(Literals.API_PATIENTS)
 @Validated
 
