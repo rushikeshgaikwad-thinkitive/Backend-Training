@@ -8,6 +8,7 @@ public final class Literals {
     public static final String PATIENTS = "patients";
 
     public static final String DOCTORS = "doctors";
+    
 
     public static final String APPOINTMENTS = "appointments";
 
@@ -15,7 +16,7 @@ public final class Literals {
 
     public static final String API_DOCTORS = "/api/doctors";
 
-    public static final String API_APPOINTMENTS = "/appointments";
+    public static final String API_APPOINTMENTS = "/api/appointments";
 
     public static final String PHONE_REGEX = "^[0-9]{10}$";
 
@@ -36,4 +37,7 @@ public final class Literals {
 
     public static final String ERROR_INTERNAL_SERVER =
             "INTERNAL_SERVER_ERROR";
+    
+    public static final String BOOTSTRAP_ADMIN_EMAIL = "rushigaikwad0702@gamil.com" ;
+    		public static final String BOOTSTRAP_ADMIN_PASSWORD ="Rushi@123";
 }

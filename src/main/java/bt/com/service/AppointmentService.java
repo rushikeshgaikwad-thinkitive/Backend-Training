@@ -57,4 +57,25 @@ public interface AppointmentService {
     );
 
     List<AppointmentView> getScheduledAppointments();
+    
+
+List<AppointmentView> getMyPatientAppointments(String email);
+
+List<AppointmentView> getMyDoctorAppointments(String email);
+
+AppointmentView getMyAppointment(
+        Long appointmentId, String email, String role);
+
+AppointmentView cancelMyPatientAppointment(
+        Long appointmentId,
+        bt.com.dto.module.AppointmentCancellation cancellation,
+        String email);
+
+AppointmentView cancelMyDoctorAppointment(
+        Long appointmentId,
+        bt.com.dto.module.AppointmentCancellation cancellation,
+        String email);
+
+AppointmentView completeMyDoctorAppointment(
+        Long appointmentId, String email);
 }
