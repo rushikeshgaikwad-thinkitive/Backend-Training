@@ -1,6 +1,7 @@
 package bt.com.dto.projection;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,8 @@ public class PatientView {
     private String email;
 
     private boolean active;
+
+    private LocalDate dateOfBirth;
 
     private Instant createdAt;
 

@@ -1,10 +1,10 @@
-# Maven
+# Maven / Java build output
 target/
 *.class
 *.jar
 *.war
 
-# Environment variables and secrets
+# Local secrets and environment files
 .env
 .env.*
 !.env.example
@@ -13,22 +13,18 @@ target/
 *.log
 logs/
 
-# Eclipse
+# IDE / workspace metadata
+.idea/
+.vscode/
 .metadata/
 .settings/
 .classpath
 .project
 .factorypath
 
-# IntelliJ
-.idea/
-
-# VS Code
-.vscode/
-
-# Operating system
+# OS files
 .DS_Store
 Thumbs.db
 
-# Docker local overrides
+# Local Docker overrides / volumes
 compose.override.yaml

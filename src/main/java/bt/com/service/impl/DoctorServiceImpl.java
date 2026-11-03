@@ -4,10 +4,12 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 import bt.com.dto.constants.Messages;
 import bt.com.dto.module.Doctor;
+import bt.com.dto.module.DoctorProfileUpdate;
 import bt.com.dto.projection.DoctorView;
 import bt.com.entity.DoctorEntity;
 import bt.com.exception.DoctorNotFoundException;
@@ -29,6 +31,7 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public DoctorView createDoctor(Doctor doctor) {
 
         log.info(Messages.CREATING_DOCTOR);
@@ -48,6 +51,7 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('DOCTOR_VIEW')")
     @Transactional(readOnly = true)
     public List<DoctorView> getAllDoctors() {
 
@@ -69,6 +73,7 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('DOCTOR_VIEW')")
     @Transactional(readOnly = true)
     public DoctorView getDoctorById(Long id) {
 
@@ -83,6 +88,7 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public DoctorView updateDoctor(
             Long id,
             Doctor doctor) {
@@ -129,6 +135,7 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteDoctor(Long id) {
 
         log.info(
@@ -148,6 +155,7 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('DOCTOR_VIEW')")
     @Transactional(readOnly = true)
     public List<DoctorView> getActiveDoctors() {
 
@@ -166,6 +174,30 @@ public class DoctorServiceImpl implements DoctorService {
                 )
                 .map(this::mapToView)
                 .toList();
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('DOCTOR_VIEW')")
+    @Transactional(readOnly = true)
+    public DoctorView getMyDoctorProfile(String email) {
+        DoctorEntity doctor = doctorRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new DoctorNotFoundException(
+                        "Doctor profile not found for this account"));
+        return mapToView(doctor);
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('DOCTOR_UPDATE_OWN')")
+    public DoctorView updateMyDoctorProfile(
+            String email,
+            DoctorProfileUpdate update) {
+        DoctorEntity doctor = doctorRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new DoctorNotFoundException(
+                        "Doctor profile not found for this account"));
+        doctor.setPhone(update.phone().trim());
+        return mapToView(doctorRepository.save(doctor));
     }
 
     private DoctorEntity getDoctor(Long id) {

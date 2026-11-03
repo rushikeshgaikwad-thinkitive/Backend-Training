@@ -18,6 +18,16 @@ public interface AppointmentRepository
             Long patientId
     );
 
+    List<AppointmentEntity> findByDoctor_IdAndPatient_Id(
+            Long doctorId,
+            Long patientId
+    );
+
+    boolean existsByDoctor_IdAndPatient_Id(
+            Long doctorId,
+            Long patientId
+    );
+
     List<AppointmentEntity> findByDoctor_Id(
             Long doctorId
     );
@@ -37,4 +47,3 @@ public interface AppointmentRepository
     Optional<AppointmentEntity> findByIdAndDoctor_Id(
             Long appointmentId, Long doctorId);
 }
-

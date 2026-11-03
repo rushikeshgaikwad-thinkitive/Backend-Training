@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 
 import bt.com.dto.constants.Messages;
@@ -18,6 +19,7 @@ import bt.com.entity.DoctorEntity;
 import bt.com.entity.PatientEntity;
 import bt.com.enums.AppointmentStatus;
 import bt.com.enums.CancelledBy;
+import bt.com.enums.Role;
 import bt.com.exception.AppointmentNotFoundException;
 import bt.com.exception.DoctorNotFoundException;
 import bt.com.exception.PatientNotFoundException;
@@ -30,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-
+@Transactional
 public class AppointmentServiceImpl  implements AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
@@ -49,7 +51,9 @@ public class AppointmentServiceImpl  implements AppointmentService {
         this.doctorRepository = doctorRepository;
     }
 
+
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public AppointmentView createAppointment(
             Appointment appointment) {
 
@@ -101,6 +105,66 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_CREATE')")
+    public AppointmentView createAppointmentForUser(
+            Appointment appointment,
+            String email,
+            String role) {
+        Role accountRole = parseRole(role);
+        Appointment scopedAppointment = Appointment.builder()
+                .id(appointment.getId())
+                .patientId(appointment.getPatientId())
+                .doctorId(appointment.getDoctorId())
+                .appointmentDate(appointment.getAppointmentDate())
+                .appointmentTime(appointment.getAppointmentTime())
+                .reason(appointment.getReason())
+                .notes(appointment.getNotes())
+                .build();
+
+        if (accountRole == Role.PATIENT) {
+            PatientEntity patient = patientRepository
+                    .findByUser_EmailIgnoreCase(email)
+                    .orElseThrow(() -> new PatientNotFoundException(
+                            "Patient profile not found for this account"));
+            if (!patient.isActive()) {
+                throw new IllegalStateException(
+                        "Inactive patient profiles cannot book appointments");
+            }
+            scopedAppointment.setPatientId(patient.getId());
+        } else if (accountRole == Role.DOCTOR) {
+            DoctorEntity doctor = doctorRepository
+                    .findByUser_EmailIgnoreCase(email)
+                    .orElseThrow(() -> new DoctorNotFoundException(
+                            "Doctor profile not found for this account"));
+            if (!doctor.isActive()) {
+                throw new IllegalStateException(
+                        "Inactive doctors cannot schedule appointments");
+            }
+            scopedAppointment.setDoctorId(doctor.getId());
+        }
+
+        DoctorEntity selectedDoctor = getDoctor(scopedAppointment.getDoctorId());
+        if (!selectedDoctor.isActive()) {
+            throw new IllegalStateException(
+                    "Appointments can only be scheduled with active doctors");
+        }
+        PatientEntity selectedPatient = getPatient(scopedAppointment.getPatientId());
+        if (!selectedPatient.isActive()) {
+            throw new IllegalStateException(
+                    "Appointments can only be scheduled for active patients");
+        }
+        if (accountRole == Role.DOCTOR
+                && !appointmentRepository.existsByDoctor_IdAndPatient_Id(
+                        selectedDoctor.getId(), selectedPatient.getId())) {
+            throw new PatientNotFoundException(
+                    "Patient is not assigned to this doctor");
+        }
+
+        return createAppointment(scopedAppointment);
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ALL')")
     @Transactional(readOnly = true)
     public List<AppointmentView> getAllAppointments() {
 
@@ -114,6 +178,27 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ASSIGNED')")
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getAppointmentsByDoctorForUser(
+            Long doctorId,
+            String email) {
+        DoctorEntity doctor = doctorRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new DoctorNotFoundException(
+                        "Doctor profile not found for this account"));
+        if (!doctor.getId().equals(doctorId)) {
+            throw new DoctorNotFoundException("Doctor profile not found");
+        }
+        return appointmentRepository.findByDoctor_Id(doctorId)
+                .stream()
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
+                .toList();
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ALL')")
     @Transactional(readOnly = true)
     public AppointmentView getAppointmentById(
             Long id) {
@@ -130,6 +215,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ALL')")
     @Transactional(readOnly = true)
     public List<AppointmentView> getAppointmentsByPatient(
             Long patientId) {
@@ -150,6 +236,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ALL')")
     @Transactional(readOnly = true)
     public List<AppointmentView> getAppointmentsByDoctor(
             Long doctorId) {
@@ -170,6 +257,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ALL')")
     @Transactional(readOnly = true)
     public List<AppointmentView> getAppointmentsByDate(
             LocalDate date) {
@@ -192,6 +280,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ALL')")
     @Transactional(readOnly = true)
     public List<AppointmentView> getScheduledAppointments() {
 
@@ -210,6 +299,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public AppointmentView updateAppointment(
             Long id,
             Appointment appointment) {
@@ -275,6 +365,34 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasAnyAuthority('APPOINTMENT_UPDATE', 'APPOINTMENT_RESCHEDULE')")
+    public AppointmentView updateAppointmentForUser(
+            Long id,
+            Appointment appointment,
+            String email,
+            String role) {
+        Role accountRole = parseRole(role);
+        if (accountRole == Role.ADMIN) {
+            return updateAppointment(id, appointment);
+        }
+
+        AppointmentView current = getMyAppointment(id, email, role);
+        Appointment scopedUpdate = Appointment.builder()
+                .id(id)
+                .patientId(current.getPatientId())
+                .doctorId(current.getDoctorId())
+                .appointmentDate(appointment.getAppointmentDate())
+                .appointmentTime(appointment.getAppointmentTime())
+                .reason(appointment.getReason())
+                .notes(accountRole == Role.PATIENT
+                        ? current.getNotes()
+                        : appointment.getNotes())
+                .build();
+        return updateAppointment(id, scopedUpdate);
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteAppointment(Long id) {
 
         log.info(
@@ -294,6 +412,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public AppointmentView completeAppointment(
             Long appointmentId) {
 
@@ -339,6 +458,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public AppointmentView cancelAppointmentByPatient(
             Long appointmentId,
             AppointmentCancellation cancellation) {
@@ -351,6 +471,7 @@ public class AppointmentServiceImpl  implements AppointmentService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
     public AppointmentView cancelAppointmentByDoctor(
             Long appointmentId,
             AppointmentCancellation cancellation) {
@@ -360,6 +481,17 @@ public class AppointmentServiceImpl  implements AppointmentService {
                 cancellation,
                 CancelledBy.DOCTOR
         );
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public AppointmentView cancelAppointmentByAdmin(
+            Long appointmentId,
+            AppointmentCancellation cancellation) {
+        return cancelAppointment(
+                appointmentId,
+                cancellation,
+                CancelledBy.ADMIN);
     }
 
     private AppointmentView cancelAppointment(
@@ -459,7 +591,195 @@ public class AppointmentServiceImpl  implements AppointmentService {
             );
         }
     }
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_OWN')")
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getMyPatientAppointments(String email) {
 
+        PatientEntity patient = patientRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new PatientNotFoundException(
+                        "Patient profile not found for: " + email));
+
+        return appointmentRepository.findByPatient_Id(patient.getId())
+                .stream()
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
+                .toList();
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ASSIGNED')")
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getMyDoctorAppointments(String email) {
+
+        DoctorEntity doctor = doctorRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new DoctorNotFoundException(
+                        "Doctor profile not found for: " + email));
+
+        return appointmentRepository.findByDoctor_Id(doctor.getId())
+                .stream()
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
+                .toList();
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_VIEW_ASSIGNED')")
+    @Transactional(readOnly = true)
+    public List<AppointmentView> getAppointmentsByPatientForDoctor(
+            Long patientId,
+            String email) {
+        DoctorEntity doctor = doctorRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new DoctorNotFoundException(
+                        "Doctor profile not found for this account"));
+        return appointmentRepository
+                .findByDoctor_IdAndPatient_Id(doctor.getId(), patientId)
+                .stream()
+                .sorted(appointmentComparator())
+                .map(this::mapToView)
+                .toList();
+    }
+
+    @Override
+    @PreAuthorize("hasAnyAuthority('APPOINTMENT_VIEW_OWN', 'APPOINTMENT_VIEW_ASSIGNED')")
+    @Transactional(readOnly = true)
+    public AppointmentView getMyAppointment(
+            Long appointmentId,
+            String email,
+            String role) {
+
+        AppointmentEntity appointment;
+
+        if ("PATIENT".equalsIgnoreCase(role)
+                || "ROLE_PATIENT".equalsIgnoreCase(role)) {
+
+            PatientEntity patient = patientRepository
+                    .findByUser_EmailIgnoreCase(email)
+                    .orElseThrow(() -> new PatientNotFoundException(
+                            "Patient profile not found"));
+
+            appointment = appointmentRepository
+                    .findByIdAndPatient_Id(
+                            appointmentId, patient.getId())
+                    .orElseThrow(() -> new AppointmentNotFoundException(
+                            "Appointment not found"));
+
+        } else if ("DOCTOR".equalsIgnoreCase(role)
+                || "ROLE_DOCTOR".equalsIgnoreCase(role)) {
+
+            DoctorEntity doctor = doctorRepository
+                    .findByUser_EmailIgnoreCase(email)
+                    .orElseThrow(() -> new DoctorNotFoundException(
+                            "Doctor profile not found"));
+
+            appointment = appointmentRepository
+                    .findByIdAndDoctor_Id(
+                            appointmentId, doctor.getId())
+                    .orElseThrow(() -> new AppointmentNotFoundException(
+                            "Appointment not found"));
+
+        } else {
+            throw new IllegalArgumentException("Invalid user role");
+        }
+
+        return mapToView(appointment);
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_CANCEL')")
+    public AppointmentView cancelMyPatientAppointment(
+            Long appointmentId,
+            AppointmentCancellation cancellation,
+            String email) {
+
+        PatientEntity patient = patientRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new PatientNotFoundException(
+                        "Patient profile not found"));
+
+        AppointmentEntity appointment = appointmentRepository
+                .findByIdAndPatient_Id(appointmentId, patient.getId())
+                .orElseThrow(() -> new AppointmentNotFoundException(
+                        "Appointment not found"));
+
+        validateCanBeCancelled(appointment);
+
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        appointment.setCancelledBy(CancelledBy.PATIENT);
+        appointment.setCancellationReason(
+                cancellation.getCancellationReason());
+        appointment.setCancelledAt(Instant.now());
+
+        return mapToView(appointmentRepository.save(appointment));
+    }
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_CANCEL')")
+    public AppointmentView cancelMyDoctorAppointment(
+            Long appointmentId,
+            AppointmentCancellation cancellation,
+            String email) {
+
+        DoctorEntity doctor = doctorRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new DoctorNotFoundException(
+                        "Doctor profile not found"));
+
+        AppointmentEntity appointment = appointmentRepository
+                .findByIdAndDoctor_Id(appointmentId, doctor.getId())
+                .orElseThrow(() -> new AppointmentNotFoundException(
+                        "Appointment not found"));
+
+        validateCanBeCancelled(appointment);
+
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        appointment.setCancelledBy(CancelledBy.DOCTOR);
+        appointment.setCancellationReason(
+                cancellation.getCancellationReason());
+        appointment.setCancelledAt(Instant.now());
+
+        return mapToView(appointmentRepository.save(appointment));
+    }
+    @Override
+    @PreAuthorize("hasAuthority('APPOINTMENT_UPDATE')")
+    public AppointmentView completeMyDoctorAppointment(
+            Long appointmentId,
+            String email) {
+
+        DoctorEntity doctor = doctorRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new DoctorNotFoundException(
+                        "Doctor profile not found"));
+
+        AppointmentEntity appointment = appointmentRepository
+                .findByIdAndDoctor_Id(appointmentId, doctor.getId())
+                .orElseThrow(() -> new AppointmentNotFoundException(
+                        "Appointment not found"));
+
+        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+            throw new IllegalStateException(
+                    Messages.CANCELLED_APPOINTMENT_CANNOT_COMPLETE);
+        }
+
+        if (appointment.getStatus() == AppointmentStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    Messages.APPOINTMENT_ALREADY_COMPLETED);
+        }
+
+        appointment.setStatus(AppointmentStatus.COMPLETED);
+
+        return mapToView(appointmentRepository.save(appointment));
+    }
+
+    private Role parseRole(String role) {
+        try {
+            return Role.valueOf(role);
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            throw new IllegalArgumentException("Invalid user role");
+        }
+    }
     private void validateAppointmentDateTime(
             LocalDate appointmentDate,
             LocalTime appointmentTime) {

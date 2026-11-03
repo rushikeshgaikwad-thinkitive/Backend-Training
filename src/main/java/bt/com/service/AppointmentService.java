@@ -15,6 +15,11 @@ public interface AppointmentService {
             Appointment appointment
     );
 
+    AppointmentView createAppointmentForUser(
+            Appointment appointment,
+            String email,
+            String role);
+
     List<AppointmentView> getAllAppointments();
 
     AppointmentView getAppointmentById(
@@ -26,6 +31,12 @@ public interface AppointmentService {
             Appointment appointment
     );
 
+    AppointmentView updateAppointmentForUser(
+            Long id,
+            Appointment appointment,
+            String email,
+            String role);
+
     void deleteAppointment(
             Long id
     );
@@ -36,6 +47,11 @@ public interface AppointmentService {
     );
 
     AppointmentView cancelAppointmentByDoctor(
+            Long appointmentId,
+            AppointmentCancellation cancellation
+    );
+
+    AppointmentView cancelAppointmentByAdmin(
             Long appointmentId,
             AppointmentCancellation cancellation
     );
@@ -62,6 +78,14 @@ public interface AppointmentService {
 List<AppointmentView> getMyPatientAppointments(String email);
 
 List<AppointmentView> getMyDoctorAppointments(String email);
+
+List<AppointmentView> getAppointmentsByPatientForDoctor(
+        Long patientId,
+        String email);
+
+List<AppointmentView> getAppointmentsByDoctorForUser(
+        Long doctorId,
+        String email);
 
 AppointmentView getMyAppointment(
         Long appointmentId, String email, String role);

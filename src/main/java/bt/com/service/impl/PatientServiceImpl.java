@@ -6,9 +6,11 @@ import java.util.List;
 
 
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import bt.com.dto.constants.Messages;
 import bt.com.dto.module.Patient;
+import bt.com.dto.module.PatientProfileUpdate;
 import bt.com.dto.projection.PatientView;
 
 import bt.com.entity.PatientEntity;
@@ -31,6 +33,7 @@ public class PatientServiceImpl implements PatientService {
         this.patientRepository = patientRepository;     
     }
     @Override
+    @PreAuthorize("hasAnyAuthority('PATIENT_MANAGE', 'PATIENT_REGISTER')")
     public PatientView createPatient(Patient patient) {
 
         log.info(Messages.CREATING_PATIENT);
@@ -50,6 +53,7 @@ public class PatientServiceImpl implements PatientService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('PATIENT_MANAGE')")
     @Transactional(readOnly = true)
     public List<PatientView> getAllPatients() {
 
@@ -70,6 +74,64 @@ public class PatientServiceImpl implements PatientService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('PATIENT_VIEW_ASSIGNED')")
+    @Transactional(readOnly = true)
+    public List<PatientView> getPatientsAssignedToDoctor(String email) {
+        return patientRepository
+                .findDistinctByAppointments_Doctor_User_EmailIgnoreCase(email)
+                .stream()
+                .sorted(
+                        Comparator.comparing(
+                                PatientEntity::getName,
+                                Comparator.nullsLast(
+                                        Comparator.naturalOrder()
+                                )
+                        )
+                )
+                .map(this::mapToView)
+                .toList();
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('PATIENT_VIEW_ASSIGNED')")
+    @Transactional(readOnly = true)
+    public PatientView getPatientAssignedToDoctor(Long id, String email) {
+        if (!patientRepository
+                .existsByIdAndAppointments_Doctor_User_EmailIgnoreCase(
+                        id, email)) {
+            throw new PatientNotFoundException(
+                    Messages.PATIENT_NOT_FOUND + id);
+        }
+        return getPatientById(id);
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('PATIENT_VIEW_OWN')")
+    @Transactional(readOnly = true)
+    public PatientView getMyPatientProfile(String email) {
+        PatientEntity patient = patientRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new PatientNotFoundException(
+                        "Patient profile not found for this account"));
+        return mapToView(patient);
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('PATIENT_UPDATE_OWN')")
+    @Transactional
+    public PatientView updateMyPatientProfile(
+            String email,
+            PatientProfileUpdate update) {
+        PatientEntity patient = patientRepository
+                .findByUser_EmailIgnoreCase(email)
+                .orElseThrow(() -> new PatientNotFoundException(
+                        "Patient profile not found for this account"));
+        patient.setPhone(update.phone().trim());
+        return mapToView(patientRepository.save(patient));
+    }
+
+    @Override
+    @PreAuthorize("hasAuthority('PATIENT_MANAGE')")
     @Transactional(readOnly = true)
     public PatientView getPatientById(Long id) {
 
@@ -90,6 +152,7 @@ public class PatientServiceImpl implements PatientService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('PATIENT_MANAGE')")
     public PatientView updatePatient(
             Long id,
             Patient patient) {
@@ -145,6 +208,7 @@ public class PatientServiceImpl implements PatientService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('PATIENT_MANAGE')")
     public void deletePatient(Long id) {
 
         log.info(
@@ -169,6 +233,7 @@ public class PatientServiceImpl implements PatientService {
     }
 
     @Override
+    @PreAuthorize("hasAuthority('PATIENT_MANAGE')")
     @Transactional(readOnly = true)
     public List<PatientView> getActivePatients() {
 
@@ -218,6 +283,7 @@ public class PatientServiceImpl implements PatientService {
                 .phone(patient.getPhone())
                 .email(patient.getEmail())
                 .active(patient.isActive())
+                .dateOfBirth(patient.getDateOfBirth())
                 .createdAt(patient.getCreatedAt())
                 .updatedAt(patient.getUpdatedAt())
                 .build();
