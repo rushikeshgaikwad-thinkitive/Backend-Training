@@ -1,2 +1,30 @@
-/BackendTraining/
+# Maven / Java build output
 target/
+*.class
+*.jar
+*.war
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# IDE / workspace metadata
+.idea/
+.vscode/
+.metadata/
+.settings/
+.classpath
+.project
+.factorypath
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local Docker overrides / volumes
+compose.override.yaml

@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import bt.com.dto.constants.Literals;
 import bt.com.dto.module.Appointment;
@@ -38,14 +40,24 @@ public class AppointmentController {
 
     @PostMapping
     public ResponseEntity<AppointmentView> createAppointment(
-            @Valid @RequestBody Appointment appointment) {
+            @Valid @RequestBody Appointment appointment,
+            Authentication authentication) {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(
-                        appointmentService.createAppointment(
-                                appointment
-                        )
+                        appointmentService.createAppointmentForUser(
+                                appointment,
+                                authentication.getName(),
+                                authentication.getAuthorities().stream()
+                                        .filter(authority ->
+                                                authority.getAuthority()
+                                                        .startsWith("ROLE_"))
+                                        .map(authority ->
+                                                authority.getAuthority()
+                                                        .substring(5))
+                                        .findFirst()
+                                        .orElse(""))
                 );
     }
 
@@ -58,37 +70,76 @@ public class AppointmentController {
         );
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<List<AppointmentView>> getMyAppointments(
+            Authentication authentication) {
+
+        List<AppointmentView> appointments;
+
+        if (hasRole(authentication, "ADMIN")) {
+            appointments = appointmentService.getAllAppointments();
+        } else if (hasRole(authentication, "PATIENT")) {
+            appointments = appointmentService.getMyPatientAppointments(
+                    authentication.getName());
+        } else if (hasRole(authentication, "DOCTOR")) {
+            appointments = appointmentService.getMyDoctorAppointments(
+                    authentication.getName());
+        } else {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "This account cannot view appointments");
+        }
+
+        return ResponseEntity.ok(appointments);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AppointmentView>
     getAppointmentById(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
+        if (hasRole(authentication, "ADMIN")) {
+            return ResponseEntity.ok(
+                    appointmentService.getAppointmentById(id));
+        }
         return ResponseEntity.ok(
-                appointmentService.getAppointmentById(id)
+                appointmentService.getMyAppointment(
+                        id,
+                        authentication.getName(),
+                        getRole(authentication))
         );
     }
 
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<List<AppointmentView>>
     getAppointmentsByPatient(
-            @PathVariable Long patientId) {
+            @PathVariable Long patientId,
+            Authentication authentication) {
 
+        if (hasRole(authentication, "ADMIN")) {
+            return ResponseEntity.ok(
+                    appointmentService.getAppointmentsByPatient(patientId));
+        }
         return ResponseEntity.ok(
-                appointmentService.getAppointmentsByPatient(
-                        patientId
-                )
+                appointmentService.getAppointmentsByPatientForDoctor(
+                        patientId, authentication.getName())
         );
     }
 
     @GetMapping("/doctor/{doctorId}")
     public ResponseEntity<List<AppointmentView>>
     getAppointmentsByDoctor(
-            @PathVariable Long doctorId) {
+            @PathVariable Long doctorId,
+            Authentication authentication) {
 
+        if (hasRole(authentication, "ADMIN")) {
+            return ResponseEntity.ok(
+                    appointmentService.getAppointmentsByDoctor(doctorId));
+        }
         return ResponseEntity.ok(
-                appointmentService.getAppointmentsByDoctor(
-                        doctorId
-                )
+                appointmentService.getAppointmentsByDoctorForUser(
+                        doctorId, authentication.getName())
         );
     }
 
@@ -117,21 +168,29 @@ public class AppointmentController {
     public ResponseEntity<AppointmentView>
     updateAppointment(
             @PathVariable Long id,
-            @Valid @RequestBody Appointment appointment) {
+            @Valid @RequestBody Appointment appointment,
+            Authentication authentication) {
 
         return ResponseEntity.ok(
-                appointmentService.updateAppointment(
+                appointmentService.updateAppointmentForUser(
                         id,
-                        appointment
-                )
+                        appointment,
+                        authentication.getName(),
+                        getRole(authentication))
         );
     }
 
     @PatchMapping("/{id}/complete")
     public ResponseEntity<AppointmentView>
     completeAppointment(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
+        if (!hasRole(authentication, "ADMIN")) {
+            return ResponseEntity.ok(
+                    appointmentService.completeMyDoctorAppointment(
+                            id, authentication.getName()));
+        }
         return ResponseEntity.ok(
                 appointmentService.completeAppointment(id)
         );
@@ -142,13 +201,12 @@ public class AppointmentController {
     cancelByPatient(
             @PathVariable Long id,
             @Valid @RequestBody
-            AppointmentCancellation cancellation) {
+            AppointmentCancellation cancellation,
+            Authentication authentication) {
 
         return ResponseEntity.ok(
-                appointmentService.cancelAppointmentByPatient(
-                        id,
-                        cancellation
-                )
+                appointmentService.cancelMyPatientAppointment(
+                        id, cancellation, authentication.getName())
         );
     }
 
@@ -157,14 +215,22 @@ public class AppointmentController {
     cancelByDoctor(
             @PathVariable Long id,
             @Valid @RequestBody
-            AppointmentCancellation cancellation) {
+            AppointmentCancellation cancellation,
+            Authentication authentication) {
 
         return ResponseEntity.ok(
-                appointmentService.cancelAppointmentByDoctor(
-                        id,
-                        cancellation
-                )
+                appointmentService.cancelMyDoctorAppointment(
+                        id, cancellation, authentication.getName())
         );
+    }
+
+    @PatchMapping("/{id}/cancel/admin")
+    public ResponseEntity<AppointmentView> cancelByAdmin(
+            @PathVariable Long id,
+            @Valid @RequestBody AppointmentCancellation cancellation) {
+        return ResponseEntity.ok(
+                appointmentService.cancelAppointmentByAdmin(
+                        id, cancellation));
     }
 
     @DeleteMapping("/{id}")
@@ -174,5 +240,21 @@ public class AppointmentController {
         appointmentService.deleteAppointment(id);
 
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority ->
+                        ("ROLE_" + role).equals(authority.getAuthority()));
+    }
+
+    private String getRole(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .filter(authority ->
+                        authority.getAuthority().startsWith("ROLE_"))
+                .map(authority ->
+                        authority.getAuthority().substring(5))
+                .findFirst()
+                .orElse("");
     }
 }

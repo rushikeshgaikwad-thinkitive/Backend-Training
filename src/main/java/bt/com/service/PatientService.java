@@ -6,21 +6,27 @@ import java.util.List;
 
 import bt.com.dto.module.Patient;
 import bt.com.dto.projection.PatientView;
-;
 
 public interface PatientService {
-	 PatientView createPatient(Patient patient);
+	PatientView createPatient(Patient patient);
 
-	    List<PatientView> getAllPatients();
+	List<PatientView> getAllPatients();
 
-	    PatientView getPatientById(Long id);
+	PatientView getPatientById(Long id);
 
-	    PatientView updatePatient(Long id, Patient patient);
+	PatientView updatePatient(Long id, Patient patient);
 
-	    void deletePatient(Long id);
+	void deletePatient(Long id);
 
-	    List<PatientView> getActivePatients();
+	List<PatientView> getActivePatients();
 
-	
-	
+	List<PatientView> getPatientsAssignedToDoctor(String email);
+
+	PatientView getPatientAssignedToDoctor(Long id, String email);
+
+	PatientView getMyPatientProfile(String email);
+
+	PatientView updateMyPatientProfile(
+			String email,
+			bt.com.dto.module.PatientProfileUpdate update);
 }

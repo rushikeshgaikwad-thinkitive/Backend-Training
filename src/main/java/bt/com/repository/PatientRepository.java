@@ -14,7 +14,13 @@ public interface PatientRepository extends JpaRepository<PatientEntity, Long> {
 	Optional<PatientEntity> findByUser_Id(Long userId);
 
 	Optional<PatientEntity> findByUser_EmailIgnoreCase(String email);
+
+	List<PatientEntity> findDistinctByAppointments_Doctor_User_EmailIgnoreCase(
+			String email);
+
+	boolean existsByIdAndAppointments_Doctor_User_EmailIgnoreCase(
+			Long id,
+			String email);
 	
 	 boolean existsByEmailIgnoreCase(String email);
 }
-

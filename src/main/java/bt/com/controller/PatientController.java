@@ -4,6 +4,7 @@ import java.util.List;
 
 import bt.com.dto.constants.Literals;
 import bt.com.dto.module.Patient;
+import bt.com.dto.module.PatientProfileUpdate;
 import bt.com.dto.projection.PatientView;
 import bt.com.service.PatientService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -12,6 +13,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,13 +63,28 @@ public class PatientController {
         );
     }
 
+    @GetMapping("/assigned")
+    public ResponseEntity<List<PatientView>> getAssignedPatients(
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                patientService.getPatientsAssignedToDoctor(
+                        authentication.getName()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PatientView> getPatientById(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
-        return ResponseEntity.ok(
-                patientService.getPatientById(id)
-        );
+        boolean canManage = authentication.getAuthorities().stream()
+                .anyMatch(authority ->
+                        authority.getAuthority().equals(
+                                bt.com.enums.Permission.PATIENT_MANAGE.name()));
+        PatientView patient = canManage
+                ? patientService.getPatientById(id)
+                : patientService.getPatientAssignedToDoctor(
+                        id, authentication.getName());
+        return ResponseEntity.ok(patient);
     }
 
     @PutMapping("/{id}")
@@ -97,5 +114,22 @@ public class PatientController {
         return ResponseEntity.ok(
                 patientService.getActivePatients()
         );
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<PatientView> getMyPatientProfile(
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                patientService.getMyPatientProfile(
+                        authentication.getName()));
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<PatientView> updateMyPatientProfile(
+            Authentication authentication,
+            @Valid @RequestBody PatientProfileUpdate update) {
+        return ResponseEntity.ok(
+                patientService.updateMyPatientProfile(
+                        authentication.getName(), update));
     }
 }

@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -18,6 +19,24 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorView> handleAuthenticationFailure(
+            AuthenticationException ex,
+            HttpServletRequest request) {
+
+        log.warn(
+                "Authentication failed: path={}",
+                request.getRequestURI()
+        );
+
+        return buildErrorResponse(
+                HttpStatus.UNAUTHORIZED,
+                "UNAUTHORIZED",
+                "Invalid email or password, or this account is not active.",
+                request.getRequestURI()
+        );
+    }
 
     @ExceptionHandler(PatientNotFoundException.class)
     public ResponseEntity<ErrorView> handlePatientNotFound(

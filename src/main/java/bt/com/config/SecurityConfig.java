@@ -2,16 +2,24 @@
 package bt.com.config;
 
 import bt.com.service.CustomUserDetailsService;
+import bt.com.enums.Permission;
+import bt.com.security.RolePermissions;
 
 import java.util.List;
+import java.util.Arrays;
+import java.util.ArrayList;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
@@ -24,6 +32,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
@@ -45,13 +54,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http)
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            CorsConfigurationSource corsConfigurationSource)
             throws Exception {
 
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(
-                    corsConfigurationSource()))
+                    corsConfigurationSource))
             .sessionManagement(session -> session
                     .sessionCreationPolicy(
                             SessionCreationPolicy.STATELESS))
@@ -61,6 +72,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
 
+                .requestMatchers(HttpMethod.GET, "/api/doctors/me")
+                    .hasAuthority(Permission.DOCTOR_VIEW.name())
+                .requestMatchers(HttpMethod.PUT, "/api/doctors/me")
+                    .hasAuthority(Permission.DOCTOR_UPDATE_OWN.name())
                 .requestMatchers(HttpMethod.POST, "/api/doctors/**")
                     .hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/doctors/**")
@@ -70,60 +85,92 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/doctors/**")
                     .hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/doctors/**")
-                    .hasAnyRole("ADMIN", "DOCTOR", "PATIENT")
+                    .hasAuthority(Permission.DOCTOR_VIEW.name())
 
+                .requestMatchers(HttpMethod.GET, "/api/patients/me")
+                    .hasAuthority(Permission.PATIENT_VIEW_OWN.name())
+                .requestMatchers(HttpMethod.PUT, "/api/patients/me")
+                    .hasAuthority(Permission.PATIENT_UPDATE_OWN.name())
+                .requestMatchers(HttpMethod.GET, "/api/patients/assigned")
+                    .hasAuthority(Permission.PATIENT_VIEW_ASSIGNED.name())
+                .requestMatchers(HttpMethod.GET, "/api/patients/active")
+                    .hasAuthority(Permission.PATIENT_MANAGE.name())
                 .requestMatchers(HttpMethod.POST, "/api/patients/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAnyAuthority(
+                            Permission.PATIENT_MANAGE.name(),
+                            Permission.PATIENT_REGISTER.name())
                 .requestMatchers(HttpMethod.PUT, "/api/patients/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAuthority(Permission.PATIENT_MANAGE.name())
                 .requestMatchers(HttpMethod.PATCH, "/api/patients/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAuthority(Permission.PATIENT_MANAGE.name())
                 .requestMatchers(HttpMethod.DELETE, "/api/patients/**")
-                    .hasRole("ADMIN")
+                    .hasAuthority(Permission.PATIENT_MANAGE.name())
+                .requestMatchers(HttpMethod.GET, "/api/patients")
+                    .hasAuthority(Permission.PATIENT_MANAGE.name())
                 .requestMatchers(HttpMethod.GET, "/api/patients/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAnyAuthority(
+                            Permission.PATIENT_MANAGE.name(),
+                            Permission.PATIENT_VIEW_ASSIGNED.name())
 
+                .requestMatchers(
+                        HttpMethod.GET, "/api/appointments/me")
+                    .hasAnyAuthority(
+                            Permission.APPOINTMENT_VIEW_OWN.name(),
+                            Permission.APPOINTMENT_VIEW_ASSIGNED.name(),
+                            Permission.APPOINTMENT_VIEW_ALL.name())
                 .requestMatchers(
                         HttpMethod.GET,
                         "/api/appointments/patient/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAnyAuthority(
+                            Permission.APPOINTMENT_VIEW_ALL.name(),
+                            Permission.APPOINTMENT_VIEW_ASSIGNED.name())
                 .requestMatchers(
                         HttpMethod.GET,
                         "/api/appointments/doctor/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAnyAuthority(
+                            Permission.APPOINTMENT_VIEW_ALL.name(),
+                            Permission.APPOINTMENT_VIEW_ASSIGNED.name())
                 .requestMatchers(
                         HttpMethod.GET,
                         "/api/appointments/date/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAuthority(Permission.APPOINTMENT_VIEW_ALL.name())
                 .requestMatchers(
                         HttpMethod.GET,
                         "/api/appointments/scheduled")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAuthority(Permission.APPOINTMENT_VIEW_ALL.name())
                 .requestMatchers(
                         HttpMethod.GET,
-                        "/api/appointments",
+                        "/api/appointments")
+                    .hasAuthority(Permission.APPOINTMENT_VIEW_ALL.name())
+                .requestMatchers(
+                        HttpMethod.GET,
                         "/api/appointments/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAnyAuthority(
+                            Permission.APPOINTMENT_VIEW_OWN.name(),
+                            Permission.APPOINTMENT_VIEW_ASSIGNED.name(),
+                            Permission.APPOINTMENT_VIEW_ALL.name())
                 .requestMatchers(
                         HttpMethod.POST,
                         "/api/appointments/**")
-                    .hasAnyRole("ADMIN", "DOCTOR", "PATIENT")
+                    .hasAuthority(Permission.APPOINTMENT_CREATE.name())
                 .requestMatchers(
                         HttpMethod.PUT,
                         "/api/appointments/**")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAnyAuthority(
+                            Permission.APPOINTMENT_UPDATE.name(),
+                            Permission.APPOINTMENT_RESCHEDULE.name())
                 .requestMatchers(
                         HttpMethod.PATCH,
-                        "/api/appointments/*/cancel/patient")
-                    .hasAnyRole("ADMIN", "PATIENT")
+                        "/api/appointments/*/cancel/admin")
+                    .hasRole("ADMIN")
                 .requestMatchers(
                         HttpMethod.PATCH,
-                        "/api/appointments/*/cancel/doctor")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                        "/api/appointments/*/cancel/**")
+                    .hasAuthority(Permission.APPOINTMENT_CANCEL.name())
                 .requestMatchers(
                         HttpMethod.PATCH,
                         "/api/appointments/*/complete")
-                    .hasAnyRole("ADMIN", "DOCTOR")
+                    .hasAuthority(Permission.APPOINTMENT_UPDATE.name())
                 .requestMatchers(
                         HttpMethod.DELETE,
                         "/api/appointments/**")
@@ -154,9 +201,13 @@ public class SecurityConfig {
                 return List.<GrantedAuthority>of();
             }
 
-            return List.of(
-                    new SimpleGrantedAuthority("ROLE_" + role)
-            );
+            List<GrantedAuthority> authorities = new ArrayList<>();
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+            RolePermissions.forRole(role).stream()
+                    .map(Permission::name)
+                    .map(SimpleGrantedAuthority::new)
+                    .forEach(authorities::add);
+            return authorities;
         });
 
         return converter;
@@ -183,13 +234,29 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origin-patterns:http://localhost:5174}")
+            String allowedOriginPatterns,
+            Environment environment) {
 
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
-        configuration.setAllowedOrigins(
-                List.of("http://localhost:5173"));
+        List<String> allowedOrigins = Arrays.stream(
+                        allowedOriginPatterns.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
+
+        if (environment.acceptsProfiles(Profiles.of("prod"))) {
+            if (allowedOrigins.stream().anyMatch(origin -> origin.contains("*"))) {
+                throw new IllegalStateException(
+                        "CORS_ALLOWED_ORIGIN must contain exact origins in production");
+            }
+            configuration.setAllowedOrigins(allowedOrigins);
+        } else {
+            configuration.setAllowedOriginPatterns(allowedOrigins);
+        }
 
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "PATCH",
